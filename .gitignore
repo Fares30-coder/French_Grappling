@@ -7,3 +7,6 @@ dist
 coverage
 *.tsbuildinfo
 .DS_Store
+
+# Exported content lives in the private repo Fares30-coder/tatamap-content, cloned here
+content/

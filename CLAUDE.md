@@ -26,7 +26,7 @@ Documents de référence :
 | Back | Node 24 + Fastify 5 + TypeScript (build tsdown, dev tsx) |
 | ORM / base | Prisma + PostgreSQL (poses en JSONB) |
 | Validation | Zod, schémas partagés front/back |
-| Auth | JWT, un seul compte admin au début |
+| Auth | Un seul compte admin créé par `pnpm admin:create` (argon2id) ; JWT HS256 de 2 h (renouvelé à l'usage) en cookie `HttpOnly; Secure; SameSite=Strict` ; contrôle d'`Origin` sur les requêtes d'écriture (ADR 0003) |
 | Hébergement | Front Vercel ou Netlify, API + base Render ou Railway |
 | CI | GitHub Actions |
 | Outillage | pnpm 12 (workspaces + catalogue), Node 24 LTS, TypeScript 6 strict, Biome (lint + format), Vitest |
@@ -34,14 +34,14 @@ Documents de référence :
 
 Structure prévue (monorepo) : `apps/web`, `apps/api`, `packages/shared`, `docker-compose.yml` (PostgreSQL local).
 
-Décisions détaillées : `docs/adr/` (0001 outillage, 0002 modèle de données et format de pose). Plan de la phase 1 : `docs/plan-phase-1.md`.
+Décisions détaillées : `docs/adr/` (0001 outillage, 0002 modèle de données et format de pose, 0003 admin, API d'écriture et éditeur). Plans : `docs/plan-phase-1.md`, `docs/plan-phase-2.md`.
 
 ## Modèle de données
 
 Une technique est une **arête entre deux positions** (départ → arrivée, arrivée vide pour une soumission) : ça donne la carte des positions sans table supplémentaire.
 
 - **Position** : id, slug, nom, description, rôle (dessus / dessous / neutre)
-- **Technique** : id, slug, nom, catégorie, niveau, gi/no-gi, statut (brouillon/publié), points clés, erreurs fréquentes ; positionDépart, positionArrivée (nullable) ; étapes ; tags
+- **Technique** : id, slug, nom, catégorie, niveau, gi/no-gi, statut (brouillon/publié), version (concurrence optimiste), points clés, erreurs fréquentes ; positionDépart, positionArrivée (nullable) ; étapes ; tags
 - **Étape** : id, ordre, titre, texte, durée de transition (ms), pose (JSONB, document `Pose`), version du squelette (miroir de `pose.skeleton`)
 - **Pose** : document JSON validé par Zod (`@tatamap/shared`), stocké dans l'étape (pas de table dédiée, cf. ADR 0002)
 - **Enchaînement** : technique source, technique cible, type (suite, contre, alternative)
@@ -106,17 +106,22 @@ Public (techniques publiées uniquement) :
 - `GET /api/techniques?categorie=&position=&niveau=&gi=&q=`
 - `GET /api/techniques/:slug` (étapes, poses, enchaînements)
 - `GET /api/positions`, `GET /api/graph` (nœuds = positions, arêtes = techniques), `GET /api/tags`
-- `POST /api/auth/login` (JWT admin)
 
-Admin (JWT) :
-- `POST /api/techniques`, `PUT /api/techniques/:id` (infos + étapes + poses), `POST /api/techniques/:id/publish`, `DELETE /api/techniques/:id`, `POST|PUT /api/positions`
+Auth : `POST /api/auth/login`, `POST /api/auth/logout`
+
+Admin (cookie de session, toutes sous `/api/admin`, un seul hook d'auth, réponses `no-store`) :
+- `GET /api/admin/me`
+- `GET|POST /api/admin/techniques`, `GET|PUT|DELETE /api/admin/techniques/:id` (PUT = remplacement complet infos + étapes + poses + tags + enchaînements, avec `version`)
+- `POST /api/admin/techniques/:id/publish`, `/unpublish`, `/duplicate`
+- `GET|POST /api/admin/positions`, `PUT /api/admin/positions/:id`
+- `GET|POST /api/admin/tags`
 
 ## Écrans
 
 - `/` Bibliothèque : recherche, filtres (catégorie, position, gi/no-gi, niveau), grille de cartes avec vignette 3D
 - `/techniques/:slug` Page technique : viewer 3D (lecture/pause, étapes, vitesse, caméra libre), étapes synchronisées, points clés, erreurs fréquentes, enchaînements
 - `/carte` Carte des positions (graphe cliquable)
-- `/admin/login`, `/admin/techniques/:id` Éditeur de poses (articulations déplaçables, aperçu, publier)
+- `/admin/login`, `/admin/techniques` (liste, création, duplication), `/admin/techniques/:id` Éditeur de poses (articulations déplaçables, vues face/profil/dessus, aperçu, publier)
 
 Le viewer 3D est **un seul composant réutilisé** (page technique, vignettes au survol, éditeur).
 
@@ -139,3 +144,4 @@ Le viewer 3D est **un seul composant réutilisé** (page technique, vignettes au
 
 - Code et commentaires en anglais, contenu du site en français.
 - TypeScript strict partout.
+- Le repo de code est **public** (portfolio). Le contenu (positions, tags, techniques) est exporté dans `content/` par `pnpm content:export` et réimporté par `pnpm content:import` (sauvegarde et passage en prod). `content/` est un clone du repo **privé** `Fares30-coder/tatamap-content`, ignoré par ce repo : ne jamais commiter de contenu ici.
