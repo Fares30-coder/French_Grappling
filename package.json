@@ -21,7 +21,9 @@
     "db:migrate": "pnpm --filter @tatamap/api exec prisma migrate dev",
     "db:reset": "pnpm --filter @tatamap/api exec prisma migrate reset --force",
     "db:seed": "pnpm --filter @tatamap/api exec prisma db seed",
-    "db:test:reset": "PRISMA_TARGET=test pnpm --filter @tatamap/api exec prisma migrate reset --force"
+    "db:test:reset": "PRISMA_TARGET=test pnpm --filter @tatamap/api exec prisma migrate reset --force",
+    "pose:check": "pnpm --filter @tatamap/pose-kit exec tsx src/cli/check.ts",
+    "pose:render": "pnpm --filter @tatamap/pose-kit exec tsx src/cli/render.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "~2.6.3"
