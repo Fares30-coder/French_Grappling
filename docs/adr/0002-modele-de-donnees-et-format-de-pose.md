@@ -585,3 +585,14 @@ Ajouter après la liste des enums :
 ```
 
 Dans « Format d'une pose », remplacer « `me` (dessous au départ, couleur #1D9E75) » par « `me` (le pratiquant qui exécute la technique, couleur #1D9E75 ; dessous au départ pour le ciseau) », et ajouter « Repère main droite, y vers le haut, 1 unité Three.js = 1 cm ; L/R = gauche/droite propres au combattant. »
+
+## Addendum (2026-10-28) : corps standard
+
+**Décision.** Les longueurs d'os des poses suivent un **corps standard** unique, symétrique (gauche = droite) et identique pour `me` et `opponent` : `STANDARD_BODY_V1_11` dans `@tatamap/shared` (adulte d'environ 1,75 m ; cou-tête 22, cou-hanche 50, cou-coude 35, coude-main 33, hanche-genou 43, genou-pied 42 cm). `standardBodyWarnings(pose, tolerance = 0,12)` signale les os qui s'en écartent ; l'éditeur et `pose:check` l'utilisent, et `@tatamap/pose-kit` expose `STANDARD_LENGTHS` pour `buildFighter`.
+
+**Raisons.**
+- Les poses du prototype (placées à l'oeil) donnaient des corps irréalistes et asymétriques (buste de 95 cm, avant-bras de 83 et 71 cm, tibias de 34 ou 82 cm).
+- L'éditeur comparait chaque étape à l'étape 1 de la même technique : si l'étape 1 était fausse, tout le reste l'était aussi sans aucun signal. Une référence fixe détecte l'erreur dès la première étape.
+- Des proportions constantes rendent les techniques comparables entre elles et préparent le rendu par corps humanoïdes (ADR 0004), qui a besoin de longueurs stables.
+
+**Portée.** Aucun changement du schéma ni du format stocké (`v1-11` reste gelé, ADR 0002 D6) : c'est une règle de contenu, vérifiée en avertissement, jamais bloquante. Les poses de `content/` sont à refaire avec le corps standard ; le seed du ciseau garde ses poses prototype (fixture de tests uniquement).
