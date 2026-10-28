@@ -12,12 +12,16 @@
     "lint": "biome ci .",
     "format": "biome check --write .",
     "test": "pnpm -r test",
+    "admin:create": "pnpm --filter @tatamap/api exec tsx scripts/create-admin.ts",
+    "content:export": "pnpm --filter @tatamap/api exec tsx scripts/content-export.ts",
+    "content:import": "pnpm --filter @tatamap/api exec tsx scripts/content-import.ts",
     "db:up": "docker compose up -d --wait db",
     "db:down": "docker compose down",
     "db:generate": "pnpm --filter @tatamap/api exec prisma generate",
     "db:migrate": "pnpm --filter @tatamap/api exec prisma migrate dev",
     "db:reset": "pnpm --filter @tatamap/api exec prisma migrate reset --force",
-    "db:seed": "pnpm --filter @tatamap/api exec prisma db seed"
+    "db:seed": "pnpm --filter @tatamap/api exec prisma db seed",
+    "db:test:reset": "PRISMA_TARGET=test pnpm --filter @tatamap/api exec prisma migrate reset --force"
   },
   "devDependencies": {
     "@biomejs/biome": "~2.6.3"

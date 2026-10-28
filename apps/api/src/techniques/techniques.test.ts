@@ -1,11 +1,13 @@
-import { apiErrorSchema, techniqueDetailSchema } from '@tatamap/shared';
+import { apiErrorSchema, currentPoseSchema, techniqueDetailSchema } from '@tatamap/shared';
 import { afterAll, describe, expect, it } from 'vitest';
-import { buildApp } from '../app';
+import { buildScissorPoses } from '../../prisma/seed-data/scissor-sweep';
 import { createPrisma } from '../db';
+import { buildTestApp } from '../test-utils';
+import { toStepCreateData } from './step-data';
 
 // Integration tests: need a migrated and seeded database (pnpm db:seed).
 const prisma = createPrisma(process.env.DATABASE_URL ?? '');
-const app = buildApp({ prisma });
+const app = await buildTestApp(prisma);
 
 afterAll(async () => {
   await app.close();
@@ -91,5 +93,46 @@ describe('GET /api/techniques/:slug', () => {
     const res = await app.inject({ method: 'GET', url: '/api/techniques/Pas_Un_Slug' });
     expect(res.statusCode).toBe(400);
     expect(apiErrorSchema.parse(res.json()).error.code).toBe('bad_request');
+  });
+
+  it('orders chains by type (followup before alternative), whatever the creation order', async () => {
+    const start = await prisma.position.findUniqueOrThrow({ where: { slug: 'garde-fermee' } });
+    const make = (slug: string) =>
+      prisma.technique.create({
+        data: {
+          slug,
+          name: slug,
+          category: 'submission',
+          level: 'beginner',
+          gi: 'both',
+          status: 'published',
+          startPositionId: start.id,
+        },
+      });
+    const source = await make('chain-source-test');
+    await prisma.step.createMany({
+      data: toStepCreateData(source.id, [
+        {
+          title: 'Étape 1',
+          text: '',
+          transitionMs: 1300,
+          pose: currentPoseSchema.parse(buildScissorPoses()[0]),
+        },
+      ]),
+    });
+    const alt = await make('chain-alt-test');
+    const next = await make('chain-next-test');
+    try {
+      await prisma.chain.create({ data: { fromId: source.id, toId: alt.id, type: 'alternative' } });
+      await prisma.chain.create({ data: { fromId: source.id, toId: next.id, type: 'followup' } });
+      const res = await app.inject({ method: 'GET', url: '/api/techniques/chain-source-test' });
+      expect(res.statusCode).toBe(200);
+      const t = techniqueDetailSchema.parse(res.json());
+      expect(t.chains.map((c) => c.type)).toEqual(['followup', 'alternative']);
+    } finally {
+      await prisma.technique.deleteMany({
+        where: { slug: { in: ['chain-source-test', 'chain-alt-test', 'chain-next-test'] } },
+      });
+    }
   });
 });

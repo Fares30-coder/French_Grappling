@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { validPose } from './pose/fixtures';
-import { techniqueDetailSchema } from './technique';
+import {
+  hasConsistentEndPosition,
+  isNumberedFrom1,
+  techniqueDetailBaseSchema,
+  techniqueDetailSchema,
+} from './technique';
 
 const summary = {
   slug: 'ciseau-garde-fermee',
@@ -55,5 +60,35 @@ describe('techniqueDetailSchema', () => {
 
   it('rejects an unknown root field', () => {
     expect(techniqueDetailSchema.safeParse({ ...base(), id: 'x' }).success).toBe(false);
+  });
+});
+
+describe('isNumberedFrom1', () => {
+  it.each([
+    [[], true],
+    [[1, 2], true],
+    [[2], false],
+    [[1, 3], false],
+  ])('%j -> %s', (orders, expected) => {
+    expect(isNumberedFrom1(orders.map((order) => ({ order })))).toBe(expected);
+  });
+});
+
+describe('hasConsistentEndPosition', () => {
+  it.each([
+    ['submission', false, true],
+    ['submission', true, false],
+    ['sweep', true, true],
+    ['sweep', false, false],
+  ] as const)('%s with end position %s -> %s', (category, hasEnd, expected) => {
+    expect(hasConsistentEndPosition(category, hasEnd)).toBe(expected);
+  });
+});
+
+describe('techniqueDetailBaseSchema', () => {
+  it('stays derivable (pick, shape)', () => {
+    const slugOnly = techniqueDetailBaseSchema.pick({ slug: true });
+    expect(slugOnly.safeParse({ slug: 'ciseau' }).success).toBe(true);
+    expect(Object.keys(techniqueDetailBaseSchema.shape)).toContain('steps');
   });
 });

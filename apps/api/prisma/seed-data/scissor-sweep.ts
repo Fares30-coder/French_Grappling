@@ -1,5 +1,6 @@
 import {
   currentPoseSchema,
+  DEFAULT_CAMERA,
   type FighterPoseV1_11,
   fighterPoseV1_11Schema,
   JOINTS_V1_11,
@@ -136,7 +137,6 @@ export const OPP_5: ReadonlyArray<Point3> = [
   [10, 6, -55],
 ];
 
-export const CAMERA = { position: [170, 170, 300], target: [0, 40, 20] } as const;
 export const STEP4_TILT_DEG = 55;
 export const STEP4_MIN_Y_CM = 6;
 export const STEP4_ME_Z_OFFSET_CM = 18;
@@ -200,7 +200,7 @@ export function buildScissorPoses(): PoseV1_11[] {
     currentPoseSchema.parse({
       skeleton: 'v1-11',
       fighters: { me: toFighter(me), opponent: toFighter(opponent) },
-      camera: { position: [...CAMERA.position], target: [...CAMERA.target] },
+      camera: structuredClone(DEFAULT_CAMERA),
     }),
   );
 }
@@ -247,5 +247,3 @@ export const SEED_TECHNIQUE = {
     'Lâcher la manche : il pose la main et bloque le renversement.',
   ],
 } as const;
-
-export const STEP_TRANSITION_MS = 1300;

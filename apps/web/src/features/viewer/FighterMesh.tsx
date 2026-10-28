@@ -1,3 +1,4 @@
+import type { ThreeEvent } from '@react-three/fiber';
 import {
   BONES_V1_11,
   FIGHTER_COLORS,
@@ -7,7 +8,7 @@ import {
   JOINTS_V1_11,
   type JointV1_11,
 } from '@tatamap/shared';
-import { type Ref, useImperativeHandle, useRef } from 'react';
+import { type Ref, useEffect, useImperativeHandle, useRef } from 'react';
 import { type Mesh, Quaternion, Vector3 } from 'three';
 
 const JOINT_RADIUS_CM = 5;
@@ -19,7 +20,19 @@ export type FighterMeshHandle = {
   setPose: (pose: FighterPoseV1_11) => void;
 };
 
-type Props = { fighter: FighterId; ref?: Ref<FighterMeshHandle> };
+const GHOST_OPACITY = 0.25;
+const SELECTED_SCALE = 1.4;
+
+type Props = {
+  fighter: FighterId;
+  ref?: Ref<FighterMeshHandle>;
+  /** 'ghost': translucent "onion skin", never pickable. */
+  variant?: 'solid' | 'ghost';
+  /** Editor: when set, joint spheres are pickable. Absent on the public site (no picking, no hand cursor). */
+  onJointPointerDown?: (joint: JointV1_11, event: ThreeEvent<PointerEvent>) => void;
+  /** Editor: joint of this fighter to highlight. */
+  selectedJoint?: JointV1_11 | null;
+};
 
 // Scratch objects reused across calls to avoid allocations in the render loop.
 const from = new Vector3();
@@ -27,10 +40,29 @@ const to = new Vector3();
 const dir = new Vector3();
 const quat = new Quaternion();
 
-export function FighterMesh({ fighter, ref }: Props) {
+export function FighterMesh({
+  fighter,
+  ref,
+  variant = 'solid',
+  onJointPointerDown,
+  selectedJoint = null,
+}: Props) {
   const jointRefs = useRef(new Map<JointV1_11, Mesh>());
   const boneRefs = useRef<Array<Mesh | null>>([]);
   const color = FIGHTER_COLORS[fighter];
+  const ghost = variant === 'ghost';
+  const pickable = !ghost && onJointPointerDown !== undefined;
+  const materialProps = ghost
+    ? ({ transparent: true, opacity: GHOST_OPACITY, depthWrite: false } as const)
+    : {};
+
+  // Do not leave a hand cursor behind if the mesh goes away while hovered.
+  useEffect(
+    () => () => {
+      if (pickable) document.body.style.cursor = '';
+    },
+    [pickable],
+  );
 
   useImperativeHandle(ref, () => ({
     setPose(pose) {
@@ -58,28 +90,58 @@ export function FighterMesh({ fighter, ref }: Props) {
 
   return (
     <group>
-      {JOINTS_V1_11.map((joint) => (
-        <mesh
-          key={joint}
-          ref={(mesh) => {
-            if (mesh) jointRefs.current.set(joint, mesh);
-            else jointRefs.current.delete(joint);
-          }}
-        >
-          <sphereGeometry args={[joint === 'head' ? HEAD_RADIUS_CM : JOINT_RADIUS_CM, 24, 16]} />
-          <meshStandardMaterial color={color} />
-        </mesh>
-      ))}
+      {JOINTS_V1_11.map((joint) => {
+        const selected = joint === selectedJoint;
+        // Handlers are only passed when pickable, so the public viewer registers no pointer events.
+        const jointEvents = pickable
+          ? {
+              onPointerDown: (event: ThreeEvent<PointerEvent>) => {
+                event.stopPropagation();
+                onJointPointerDown?.(joint, event);
+              },
+              onPointerOver: (event: ThreeEvent<PointerEvent>) => {
+                event.stopPropagation();
+                document.body.style.cursor = 'pointer';
+              },
+              onPointerOut: () => {
+                document.body.style.cursor = '';
+              },
+            }
+          : // A ghost never takes events: it must not hide the solid sphere behind it.
+            ghost
+            ? { raycast: () => null }
+            : {};
+        return (
+          <mesh
+            key={joint}
+            ref={(mesh) => {
+              if (mesh) jointRefs.current.set(joint, mesh);
+              else jointRefs.current.delete(joint);
+            }}
+            scale={selected ? SELECTED_SCALE : 1}
+            {...jointEvents}
+          >
+            <sphereGeometry args={[joint === 'head' ? HEAD_RADIUS_CM : JOINT_RADIUS_CM, 24, 16]} />
+            <meshStandardMaterial
+              color={color}
+              emissive={selected ? color : '#000000'}
+              emissiveIntensity={selected ? 0.6 : 0}
+              {...materialProps}
+            />
+          </mesh>
+        );
+      })}
       {BONES_V1_11.map(([a, b], i) => (
         <mesh
           key={`${a}-${b}`}
+          {...(ghost ? { raycast: () => null } : {})}
           ref={(mesh) => {
             boneRefs.current[i] = mesh;
           }}
         >
           {/* Unit-height cylinder: scale.y is set to the bone length. */}
           <cylinderGeometry args={[BONE_RADIUS_CM, BONE_RADIUS_CM, 1, 12]} />
-          <meshStandardMaterial color={color} />
+          <meshStandardMaterial color={color} {...materialProps} />
         </mesh>
       ))}
     </group>

@@ -69,6 +69,8 @@ model Technique {
   status         TechniqueStatus @default(draft)
   keyPoints      String[]
   commonMistakes String[]
+  /// Optimistic concurrency token, incremented by every admin write.
+  version        Int             @default(1)
 
   startPositionId String    @db.Uuid
   startPosition   Position  @relation("TechniqueStart", fields: [startPositionId], references: [id], onDelete: Restrict)
@@ -98,6 +100,7 @@ model Step {
   order        Int
   title        String
   text         String    @default("")
+  /// Keep in sync with DEFAULT_TRANSITION_MS in packages/shared/src/defaults.ts
   transitionMs Int       @default(1300)
   skeleton     String
   pose         Json
@@ -129,5 +132,7 @@ model Admin {
   id           String   @id @default(uuid(7)) @db.Uuid
   email        String   @unique
   passwordHash String
+  /// Bumped on logout and password change: tokens carrying an older value are refused.
+  sessionVersion Int    @default(0)
   createdAt    DateTime @default(now())
 }
