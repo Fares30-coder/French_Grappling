@@ -14,3 +14,6 @@ allowBuilds:
   esbuild: true
   prisma: true
   "@prisma/engines": true
+
+minimumReleaseAgeExclude:
+  - react-router@8.5.1
