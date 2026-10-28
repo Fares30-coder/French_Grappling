@@ -1,4 +1,4 @@
-import type { BoneKey, FighterId, JointV1_11 } from '@tatamap/shared';
+import type { BoneKey, FighterId, JointV1_11, PoseWarning } from '@tatamap/shared';
 
 export const FIGHTER_LABELS_FR: Record<FighterId, string> = {
   me: 'Toi',
@@ -34,3 +34,11 @@ export const BONE_LABELS_FR: Readonly<Record<string, string>> = {
 
 /** French name of a bone; falls back on the key itself (cannot happen for the 9 real bones). */
 export const boneLabel = (bone: BoneKey): string => BONE_LABELS_FR[bone] ?? bone;
+
+const capitalize = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** "Avant-bras gauche de toi : 42 cm (réf. 31 cm)". */
+export function formatWarning(w: PoseWarning): string {
+  const owner = w.fighter === 'me' ? 'toi' : "l'adversaire";
+  return `${capitalize(boneLabel(w.bone))} de ${owner} : ${Math.round(w.lengthCm)} cm (réf. ${Math.round(w.referenceCm)} cm)`;
+}

@@ -7,10 +7,18 @@ import { TechniqueViewer } from '../../viewer/TechniqueViewer';
 import { isUnauthorized, useAdminPositions, useAdminTechnique, useSaveTechnique } from '../api';
 import { adminErrorMessage } from '../errors';
 import { CameraCapture } from './CameraCapture';
-import { editorReducer, initialEditorState, isDirty, toUpdateInput } from './editor-state';
+import {
+  currentWarnings,
+  type EditorAction,
+  editorReducer,
+  initialEditorState,
+  isDirty,
+  toUpdateInput,
+} from './editor-state';
 import { JointGizmo } from './JointGizmo';
 import { JointPanel } from './JointPanel';
 import { MetaForm } from './MetaForm';
+import { PoseTools } from './PoseTools';
 import { StepsPanel } from './StepsPanel';
 import { useUnsavedGuard } from './use-unsaved-guard';
 import { validateUpdateInput } from './validation';
@@ -63,7 +71,14 @@ function TechniqueEditor({
   loaded: AdminTechnique;
   reload: () => Promise<void>;
 }) {
-  const [state, dispatch] = useReducer(editorReducer, loaded, initialEditorState);
+  const [state, rawDispatch] = useReducer(editorReducer, loaded, initialEditorState);
+  const [playing, setPlaying] = useState(false);
+  const [ghost, setGhost] = useState(true);
+  // Any user action stops playback; the steps reached by playback itself use rawDispatch.
+  const dispatch = useCallback((action: EditorAction) => {
+    setPlaying(false);
+    rawDispatch(action);
+  }, []);
   const positions = useAdminPositions();
   const save = useSaveTechnique(loaded.id);
   const [showErrors, setShowErrors] = useState(false);
@@ -102,12 +117,27 @@ function TechniqueEditor({
       onSuccess: (technique) =>
         dispatch({ type: 'saved', version: technique.version, revision: sentRevision }),
     });
-  }, [input, save, state.revision]);
+  }, [input, save, state.revision, dispatch]);
 
   // Cmd/Ctrl+S saves instead of the browser's "save page"; Escape drops the selection.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') dispatch({ type: 'selectJoint', joint: null });
+      // Inside a text field, Cmd/Ctrl+Z is the browser's own undo of the text.
+      const target = event.target;
+      const inField =
+        target instanceof HTMLElement &&
+        (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+      if ((event.metaKey || event.ctrlKey) && !inField) {
+        const key = event.key.toLowerCase();
+        if (key === 'z') {
+          event.preventDefault();
+          dispatch({ type: event.shiftKey ? 'redo' : 'undo' });
+        } else if (key === 'y') {
+          event.preventDefault();
+          dispatch({ type: 'redo' });
+        }
+      }
       if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === 's') {
         event.preventDefault();
         onSave();
@@ -115,7 +145,7 @@ function TechniqueEditor({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onSave]);
+  }, [onSave, dispatch]);
 
   const conflict = save.error && 'reason' in save.error && save.error.reason === 'version_mismatch';
   const published = loaded.status === 'published';
@@ -192,13 +222,17 @@ function TechniqueEditor({
             className="aspect-video w-full overflow-hidden rounded-lg"
             steps={state.technique.steps}
             stepIndex={state.stepIndex}
-            playing={false}
+            playing={playing}
+            onStepChange={(index) => rawDispatch({ type: 'selectStep', index })}
+            ghostPose={
+              ghost && !playing ? (state.technique.steps[state.stepIndex - 1]?.pose ?? null) : null
+            }
             view={view}
             cameraKey={cameraKey}
             selectedJoint={selectedJoint}
             onJointPointerDown={(joint) => dispatch({ type: 'selectJoint', joint })}
           >
-            {selectedJoint && selectedPosition && (
+            {!playing && selectedJoint && selectedPosition && (
               <JointGizmo
                 position={selectedPosition}
                 view={view}
@@ -262,6 +296,22 @@ function TechniqueEditor({
               Cette étape s'ouvre avec un angle conseillé.
             </p>
           )}
+          <div className="mt-4">
+            <PoseTools
+              canUndo={state.history.past.length > 0}
+              canRedo={state.history.future.length > 0}
+              onUndo={() => dispatch({ type: 'undo' })}
+              onRedo={() => dispatch({ type: 'redo' })}
+              ghost={ghost}
+              onGhost={setGhost}
+              hasPrevious={state.stepIndex > 0}
+              onCopyPrevious={() => dispatch({ type: 'copyPreviousPose' })}
+              onMirror={(scope) => dispatch({ type: 'mirror', scope })}
+              playing={playing}
+              onTogglePlay={() => setPlaying((p) => !p)}
+              warnings={currentWarnings(state)}
+            />
+          </div>
           <div className="mt-4">
             <JointPanel
               selected={selectedJoint}
