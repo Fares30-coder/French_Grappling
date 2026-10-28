@@ -10,6 +10,14 @@ export function HomePage() {
           Voir le ciseau depuis la garde fermée
         </Link>
       </p>
+      {/* Dev only: the admin has no public entry point. */}
+      {import.meta.env.DEV && (
+        <p className="mt-4">
+          <Link className="text-slate-600 underline" to="/admin">
+            Admin
+          </Link>
+        </p>
+      )}
     </main>
   );
 }
