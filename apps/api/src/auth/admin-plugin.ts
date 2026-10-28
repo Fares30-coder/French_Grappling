@@ -3,6 +3,9 @@ import type { AppConfig } from '../config';
 import { sendApiError } from '../errors';
 import type { PrismaClient } from '../generated/prisma/client';
 import { registerMeRoute } from '../routes/admin/me';
+import { registerAdminPositionRoutes } from '../routes/admin/positions';
+import { registerAdminTagRoutes } from '../routes/admin/tags';
+import { registerAdminTechniqueRoutes } from '../routes/admin/techniques';
 import { authenticate, issueSession, shouldRenew } from './session';
 
 type Options = { prisma: PrismaClient; config: AppConfig };
@@ -36,4 +39,7 @@ export const adminPlugin: FastifyPluginAsync<Options> = async (app, { prisma, co
   );
 
   registerMeRoute(app);
+  registerAdminTechniqueRoutes(app, prisma);
+  registerAdminPositionRoutes(app, prisma);
+  registerAdminTagRoutes(app, prisma);
 };

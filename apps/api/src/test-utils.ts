@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
+import { STARTER_POSE } from '@tatamap/shared';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from './app';
 import { hashPassword } from './auth/password';
 import type { AppConfig } from './config';
 import type { PrismaClient } from './generated/prisma/client';
+import { toStepCreateData } from './techniques/step-data';
 
 /** Origin accepted by the test configuration; send it on every unsafe request. */
 export const ORIGIN = 'http://localhost:5173';
@@ -88,4 +90,35 @@ export function sessionCookie(
     authTime: claims.authTime ?? Math.floor(Date.now() / 1000),
   };
   return `${cookieName}=${app.jwt.sign(payload, { expiresIn })}`;
+}
+
+/** Creates a technique straight in the database (a submission from the seeded closed guard). */
+export async function createTestTechnique(
+  prisma: PrismaClient,
+  options: { status?: 'draft' | 'published'; stepCount?: number; keyPoints?: string[] } = {},
+): Promise<{ id: string; slug: string }> {
+  const start = await prisma.position.findUniqueOrThrow({ where: { slug: 'garde-fermee' } });
+  const slug = uniqueSlug('t');
+  const status = options.status ?? 'draft';
+  const technique = await prisma.technique.create({
+    data: {
+      slug,
+      name: `Test ${slug}`,
+      category: 'submission',
+      level: 'beginner',
+      gi: 'both',
+      status,
+      publishedAt: status === 'published' ? new Date() : null,
+      keyPoints: options.keyPoints ?? [],
+      startPositionId: start.id,
+    },
+  });
+  const steps = Array.from({ length: options.stepCount ?? 1 }, (_, i) => ({
+    title: `Étape ${i + 1}`,
+    text: '',
+    transitionMs: 1300,
+    pose: STARTER_POSE,
+  }));
+  await prisma.step.createMany({ data: toStepCreateData(technique.id, steps) });
+  return { id: technique.id, slug };
 }
