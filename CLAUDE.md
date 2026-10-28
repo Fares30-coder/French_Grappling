@@ -23,14 +23,18 @@ Documents de référence :
 | 3D | React Three Fiber + drei (OrbitControls) |
 | Données front | React Router + TanStack Query |
 | PWA | vite-plugin-pwa (hors ligne au club) |
-| Back | Node + Fastify (Express envisagé, Fastify par défaut) + TypeScript |
+| Back | Node 24 + Fastify 5 + TypeScript (build tsdown, dev tsx) |
 | ORM / base | Prisma + PostgreSQL (poses en JSONB) |
 | Validation | Zod, schémas partagés front/back |
 | Auth | JWT, un seul compte admin au début |
 | Hébergement | Front Vercel ou Netlify, API + base Render ou Railway |
 | CI | GitHub Actions |
+| Outillage | pnpm 12 (workspaces + catalogue), Node 24 LTS, TypeScript 6 strict, Biome (lint + format), Vitest |
+| Base locale | PostgreSQL 17 via docker-compose |
 
 Structure prévue (monorepo) : `apps/web`, `apps/api`, `packages/shared`, `docker-compose.yml` (PostgreSQL local).
+
+Décisions détaillées : `docs/adr/` (0001 outillage, 0002 modèle de données et format de pose). Plan de la phase 1 : `docs/plan-phase-1.md`.
 
 ## Modèle de données
 
@@ -38,15 +42,16 @@ Une technique est une **arête entre deux positions** (départ → arrivée, arr
 
 - **Position** : id, slug, nom, description, rôle (dessus / dessous / neutre)
 - **Technique** : id, slug, nom, catégorie, niveau, gi/no-gi, statut (brouillon/publié), points clés, erreurs fréquentes ; positionDépart, positionArrivée (nullable) ; étapes ; tags
-- **Étape** : id, ordre, titre, texte, durée de transition (ms) ; une pose
-- **Pose** : id, données JSONB, version du squelette
+- **Étape** : id, ordre, titre, texte, durée de transition (ms), pose (JSONB, document `Pose`), version du squelette (miroir de `pose.skeleton`)
+- **Pose** : document JSON validé par Zod (`@tatamap/shared`), stocké dans l'étape (pas de table dédiée, cf. ADR 0002)
 - **Enchaînement** : technique source, technique cible, type (suite, contre, alternative)
 - **Tag** (many-to-many avec Technique), **Admin** (email, hash mot de passe)
-- Enums : catégorie = soumission, passage, renversement, sortie, projection ; niveau = débutant, intermédiaire, avancé
+- Enums : catégorie = soumission, passage, renversement, sortie, projection ; niveau = débutant, intermédiaire, avancé ; gi/no-gi = gi, nogi, both
+- Valeurs d'enum en anglais dans le code, la base et l'API (submission, pass, sweep, escape, takedown ; beginner, intermediate, advanced ; gi, nogi, both ; top, bottom, neutral ; followup, counter, alternative), libellés français dans `@tatamap/shared`. Le rôle d'une position est exprimé du point de vue de `me`.
 
 ### Format d'une pose (squelette `v1-11`)
 
-11 articulations par combattant, en (x, y, z), en cm, tatami à y = 0. Ordre : head, neck, hip, elbowL, handL, elbowR, handR, kneeL, footL, kneeR, footR. Combattants : `me` (dessous au départ, couleur #1D9E75) et `opponent` (#D85A30). `camera` optionnelle (angle conseillé par étape).
+11 articulations par combattant, en (x, y, z), en cm, tatami à y = 0. Ordre : head, neck, hip, elbowL, handL, elbowR, handR, kneeL, footL, kneeR, footR. Combattants : `me` (le pratiquant qui exécute la technique, couleur #1D9E75 ; dessous au départ pour le ciseau) et `opponent` (#D85A30). `camera` optionnelle (angle conseillé par étape). Repère main droite, y vers le haut, 1 unité Three.js = 1 cm ; L/R = gauche/droite propres au combattant.
 
 ```json
 {
