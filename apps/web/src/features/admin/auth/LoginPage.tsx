@@ -12,8 +12,10 @@ export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // Already logged in: nothing to do here.
-  if (session.data) return <Navigate to={next} replace />;
+  // Already logged in: nothing to do here. Checks isSuccess, not data: after a failed /me refetch
+  // (e.g. Safari dropping the cookie), data still holds the login response, and redirecting on it
+  // would bounce forever between this page and RequireAdmin.
+  if (session.isSuccess) return <Navigate to={next} replace />;
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
