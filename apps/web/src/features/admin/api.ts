@@ -1,5 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { type AdminSession, adminSessionSchema, type LoginInput } from '@tatamap/shared';
+import {
+  type AdminSession,
+  adminPositionListSchema,
+  adminSessionSchema,
+  adminTechniqueListSchema,
+  adminTechniqueSchema,
+  type LoginInput,
+  type TechniqueCreateInput,
+} from '@tatamap/shared';
 import { ApiRequestError, apiRequest, apiSend } from '../../lib/api';
 
 /**
@@ -53,5 +61,53 @@ export function useLogout() {
     onSettled: () => {
       queryClient.clear();
     },
+  });
+}
+
+const TECHNIQUES_KEY = ['admin', 'techniques'] as const;
+const POSITIONS_KEY = ['admin', 'positions'] as const;
+
+export function useAdminTechniques() {
+  return useQuery({
+    queryKey: TECHNIQUES_KEY,
+    queryFn: ({ signal }) =>
+      apiRequest('/api/admin/techniques', adminTechniqueListSchema, { signal }),
+    ...adminQueryDefaults,
+  });
+}
+
+export function useAdminPositions() {
+  return useQuery({
+    queryKey: POSITIONS_KEY,
+    queryFn: ({ signal }) =>
+      apiRequest('/api/admin/positions', adminPositionListSchema, { signal }),
+    ...adminQueryDefaults,
+  });
+}
+
+export function useCreateTechnique() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: TechniqueCreateInput) =>
+      apiRequest('/api/admin/techniques', adminTechniqueSchema, { method: 'POST', body: input }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: TECHNIQUES_KEY }),
+  });
+}
+
+export function useDuplicateTechnique() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    // No body on purpose: the API refuses one.
+    mutationFn: (id: string) =>
+      apiRequest(`/api/admin/techniques/${id}/duplicate`, adminTechniqueSchema, { method: 'POST' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: TECHNIQUES_KEY }),
+  });
+}
+
+export function useDeleteTechnique() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiSend(`/api/admin/techniques/${id}`, { method: 'DELETE' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: TECHNIQUES_KEY }),
   });
 }
