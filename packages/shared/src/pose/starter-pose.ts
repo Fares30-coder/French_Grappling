@@ -2,19 +2,22 @@ import { DEFAULT_CAMERA } from '../defaults';
 import type { CurrentPose } from './pose';
 import type { FighterPoseV1_11, Vec3 } from './skeleton-v1-11';
 
-/** `me`, standing and facing +x (his left side is towards -z), centred at x = -50. */
+/**
+ * `me`, standing and facing +x (his left side is towards -z), centred at x = -50. Bone lengths
+ * follow STANDARD_BODY_V1_11.
+ */
 const me: FighterPoseV1_11 = {
-  head: [-50, 160, 0],
-  neck: [-50, 140, 0],
-  hip: [-50, 95, 0],
-  elbowL: [-40, 110, -20],
-  handL: [-15, 128, -15],
-  elbowR: [-40, 110, 20],
-  handR: [-15, 128, 15],
-  kneeL: [-45, 50, -12],
-  footL: [-50, 5, -15],
-  kneeR: [-45, 50, 12],
-  footR: [-50, 5, 15],
+  head: [-50, 165, 0],
+  neck: [-50, 143, 0],
+  hip: [-50, 93, 0],
+  elbowL: [-44, 112.8, -16.6],
+  handL: [-15.8, 129.7, -19.4],
+  elbowR: [-44, 112.8, 16.6],
+  handR: [-15.8, 129.7, 19.4],
+  kneeL: [-45.8, 50.5, -5.1],
+  footL: [-45.8, 8.6, -7.2],
+  kneeR: [-45.8, 50.5, 5.1],
+  footR: [-45.8, 8.6, 7.2],
 };
 
 /** A half-turn around the y axis, which keeps left and right correct: [x, y, z] -> [-x, y, -z]. */
