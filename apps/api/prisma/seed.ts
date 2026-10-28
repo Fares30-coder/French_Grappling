@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { currentPoseSchema } from '@tatamap/shared';
+import { currentPoseSchema, DEFAULT_TRANSITION_MS } from '@tatamap/shared';
 import { createPrisma } from '../src/db';
 import {
   buildScissorPoses,
@@ -7,7 +7,6 @@ import {
   SEED_TAG,
   SEED_TECHNIQUE,
   STEP_TITLES,
-  STEP_TRANSITION_MS,
 } from './seed-data/scissor-sweep';
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -59,7 +58,7 @@ async function main() {
         order: i + 1,
         title: STEP_TITLES[i] ?? '',
         text: '',
-        transitionMs: STEP_TRANSITION_MS,
+        transitionMs: DEFAULT_TRANSITION_MS,
         skeleton: pose.skeleton,
         pose,
       })),

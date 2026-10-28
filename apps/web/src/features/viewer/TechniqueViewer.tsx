@@ -1,11 +1,11 @@
 import { OrbitControls } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
-import type { CurrentPose } from '@tatamap/shared';
+import { type CurrentPose, DEFAULT_CAMERA, DEFAULT_HOLD_MS } from '@tatamap/shared';
 import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import { FighterMesh, type FighterMeshHandle } from './FighterMesh';
 import { interpolatePose } from './interpolate';
 import { Tatami } from './Tatami';
-import { buildTimeline, DEFAULT_HOLD_MS, isStepEcho, sampleTimeline, timeAtStep } from './timeline';
+import { buildTimeline, isStepEcho, sampleTimeline, timeAtStep } from './timeline';
 
 export type ViewerStep = { pose: CurrentPose; transitionMs: number };
 
@@ -26,11 +26,6 @@ export type TechniqueViewerProps = {
   onStepChange?: (index: number) => void;
   className?: string;
 };
-
-const DEFAULT_CAMERA = {
-  position: [170, 170, 300],
-  target: [0, 40, 20],
-} as const;
 
 // A long frame (background tab, breakpoint) must not make the animation jump.
 const MAX_DELTA_S = 0.1;

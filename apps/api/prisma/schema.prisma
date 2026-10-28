@@ -98,6 +98,7 @@ model Step {
   order        Int
   title        String
   text         String    @default("")
+  /// Keep in sync with DEFAULT_TRANSITION_MS in packages/shared/src/defaults.ts
   transitionMs Int       @default(1300)
   skeleton     String
   pose         Json

@@ -1,4 +1,4 @@
-export const DEFAULT_HOLD_MS = 1200;
+import { DEFAULT_HOLD_MS } from '@tatamap/shared';
 
 type Segment =
   | { kind: 'hold'; stepIndex: number; startMs: number; durationMs: number }
