@@ -1,15 +1,26 @@
-import type { AdminTechnique } from '@tatamap/shared';
-import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
+import type { AdminTechnique, CameraHint, Vec3 } from '@tatamap/shared';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { ApiRequestError } from '../../../lib/api';
+import type { ViewPreset } from '../../viewer/camera';
 import { TechniqueViewer } from '../../viewer/TechniqueViewer';
 import { isUnauthorized, useAdminPositions, useAdminTechnique, useSaveTechnique } from '../api';
 import { adminErrorMessage } from '../errors';
+import { CameraCapture } from './CameraCapture';
 import { editorReducer, initialEditorState, isDirty, toUpdateInput } from './editor-state';
+import { JointGizmo } from './JointGizmo';
+import { JointPanel } from './JointPanel';
 import { MetaForm } from './MetaForm';
 import { StepsPanel } from './StepsPanel';
 import { useUnsavedGuard } from './use-unsaved-guard';
 import { validateUpdateInput } from './validation';
+
+const VIEWS: ReadonlyArray<readonly [ViewPreset, string]> = [
+  ['step', '3D'],
+  ['front', 'Face'],
+  ['side', 'Profil'],
+  ['top', 'Dessus'],
+];
 
 /** Loads the technique, then hands it to the editor (which owns the editing state). */
 export function TechniqueEditorPage() {
@@ -59,6 +70,25 @@ function TechniqueEditor({
   const dirty = isDirty(state);
   useUnsavedGuard(dirty);
 
+  // 3D view: preset + a counter that re-applies the framing (also for "Recentrer").
+  const [view, setView] = useState<ViewPreset>('step');
+  const [cameraKey, setCameraKey] = useState(0);
+  const captureRef = useRef<(() => CameraHint | null) | null>(null);
+  const showView = (next: ViewPreset) => {
+    setView(next);
+    setCameraKey((k) => k + 1);
+  };
+
+  const { selectedJoint } = state;
+  const currentStep = state.technique.steps[state.stepIndex];
+  const selectedPosition: Vec3 | null =
+    selectedJoint && currentStep
+      ? currentStep.pose.fighters[selectedJoint.fighter][selectedJoint.joint]
+      : null;
+  const moveSelected = (position: Vec3) => {
+    if (selectedJoint) dispatch({ type: 'setJoint', joint: selectedJoint, position });
+  };
+
   const input = useMemo(() => toUpdateInput(state), [state]);
   const errors = useMemo(() => (showErrors ? validateUpdateInput(input) : {}), [showErrors, input]);
 
@@ -74,9 +104,10 @@ function TechniqueEditor({
     });
   }, [input, save, state.revision]);
 
-  // Cmd/Ctrl+S saves instead of the browser's "save page".
+  // Cmd/Ctrl+S saves instead of the browser's "save page"; Escape drops the selection.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') dispatch({ type: 'selectJoint', joint: null });
       if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === 's') {
         event.preventDefault();
         onSave();
@@ -162,7 +193,83 @@ function TechniqueEditor({
             steps={state.technique.steps}
             stepIndex={state.stepIndex}
             playing={false}
-          />
+            view={view}
+            cameraKey={cameraKey}
+            selectedJoint={selectedJoint}
+            onJointPointerDown={(joint) => dispatch({ type: 'selectJoint', joint })}
+          >
+            {selectedJoint && selectedPosition && (
+              <JointGizmo
+                position={selectedPosition}
+                view={view}
+                onBegin={() => dispatch({ type: 'beginJointDrag' })}
+                onMove={moveSelected}
+                onEnd={() => dispatch({ type: 'endJointDrag' })}
+              />
+            )}
+            <CameraCapture captureRef={captureRef} />
+          </TechniqueViewer>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <fieldset className="flex gap-1">
+              <legend className="sr-only">Vue</legend>
+              {VIEWS.map(([preset, label]) => (
+                <button
+                  key={preset}
+                  type="button"
+                  aria-pressed={view === preset}
+                  className={`rounded border px-3 py-1 text-sm ${
+                    view === preset
+                      ? 'border-emerald-700 bg-emerald-50 font-semibold'
+                      : 'border-slate-300'
+                  }`}
+                  onClick={() => showView(preset)}
+                >
+                  {label}
+                </button>
+              ))}
+            </fieldset>
+            <button
+              type="button"
+              className="rounded border border-slate-300 px-3 py-1 text-sm"
+              onClick={() => setCameraKey((k) => k + 1)}
+            >
+              Recentrer
+            </button>
+            <button
+              type="button"
+              disabled={view !== 'step'}
+              title={view === 'step' ? undefined : 'Passe en vue 3D pour choisir un angle'}
+              className="rounded border border-slate-300 px-3 py-1 text-sm disabled:opacity-50"
+              onClick={() => {
+                const camera = captureRef.current?.();
+                if (camera) dispatch({ type: 'setStepCamera', camera });
+              }}
+            >
+              Utiliser cet angle pour l'étape
+            </button>
+            {currentStep?.pose.camera && (
+              <button
+                type="button"
+                className="rounded border border-slate-300 px-3 py-1 text-sm"
+                onClick={() => dispatch({ type: 'setStepCamera', camera: undefined })}
+              >
+                Retirer l'angle
+              </button>
+            )}
+          </div>
+          {currentStep?.pose.camera && (
+            <p className="mt-1 text-xs text-slate-600">
+              Cette étape s'ouvre avec un angle conseillé.
+            </p>
+          )}
+          <div className="mt-4">
+            <JointPanel
+              selected={selectedJoint}
+              position={selectedPosition}
+              onSelect={(joint) => dispatch({ type: 'selectJoint', joint })}
+              onMove={moveSelected}
+            />
+          </div>
           <div className="mt-6">
             <StepsPanel
               steps={state.technique.steps}
