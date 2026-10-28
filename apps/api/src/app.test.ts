@@ -28,6 +28,7 @@ describe('app', () => {
   it('sets security headers (nosniff, CSP default-src none)', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/health' });
     expect(res.headers['x-content-type-options']).toBe('nosniff');
+    expect(res.headers['strict-transport-security']).toBe('max-age=31536000; includeSubDomains');
     expect(res.headers['content-security-policy']).toBe(
       "default-src 'none';frame-ancestors 'none'",
     );
