@@ -12,7 +12,7 @@ describe('buildTimeline', () => {
   it('uses the transitionMs of the destination step', () => {
     const tl = buildTimeline(
       [{ transitionMs: 999 }, { transitionMs: 500 }, { transitionMs: 700 }],
-      {
+      { 
         holdMs: 100,
       },
     );
