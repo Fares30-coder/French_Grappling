@@ -21,7 +21,20 @@ const envSchema = z
           .map((o) => o.trim())
           .filter(Boolean),
       )
-      .pipe(z.array(z.url().transform((u) => new URL(u).origin)).min(1)),
+      .pipe(
+        z
+          .array(
+            z
+              .url()
+              // mailto:, ftp:, javascript:... are valid URLs but never valid web origins.
+              .refine(
+                (u) => URL.canParse(u) && ['http:', 'https:'].includes(new URL(u).protocol),
+                'WEB_ORIGINS entries must be http: or https: URLs',
+              )
+              .transform((u) => new URL(u).origin),
+          )
+          .min(1),
+      ),
     COOKIE_SECURE: z
       .enum(['true', 'false'])
       .default('true')
@@ -31,7 +44,14 @@ const envSchema = z
   .refine((e) => e.NODE_ENV !== 'production' || e.COOKIE_SECURE, {
     message: 'COOKIE_SECURE=false is forbidden in production',
     path: ['COOKIE_SECURE'],
-  });
+  })
+  .refine(
+    (e) => e.NODE_ENV !== 'production' || e.WEB_ORIGINS.every((o) => o.startsWith('https:')),
+    {
+      message: 'WEB_ORIGINS must be https: URLs in production',
+      path: ['WEB_ORIGINS'],
+    },
+  );
 export type Env = z.infer<typeof envSchema>;
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {

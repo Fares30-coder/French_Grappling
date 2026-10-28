@@ -39,6 +39,27 @@ describe('loadEnv', () => {
     expect(() => loadEnv({ ...valid, WEB_ORIGINS: 'not a url' })).toThrow(/WEB_ORIGINS/);
   });
 
+  it('accepts only http: and https: origins', () => {
+    for (const bad of ['mailto:a@b.test', 'ftp://example.test', 'javascript:alert(1)']) {
+      expect(() => loadEnv({ ...valid, WEB_ORIGINS: bad })).toThrow(/WEB_ORIGINS/);
+    }
+    expect(() => loadEnv({ ...valid, WEB_ORIGINS: 'https://tatamap.fr, mailto:a@b.test' })).toThrow(
+      /WEB_ORIGINS/,
+    );
+  });
+
+  it('requires https: origins in production only', () => {
+    const production = { ...valid, NODE_ENV: 'production' };
+    expect(() => loadEnv({ ...production, WEB_ORIGINS: 'http://tatamap.fr' })).toThrow(
+      /WEB_ORIGINS/,
+    );
+    expect(() =>
+      loadEnv({ ...production, WEB_ORIGINS: 'https://tatamap.fr,http://localhost:5173' }),
+    ).toThrow(/WEB_ORIGINS/);
+    expect(() => loadEnv({ ...production, WEB_ORIGINS: 'https://tatamap.fr' })).not.toThrow();
+    expect(() => loadEnv({ ...valid, WEB_ORIGINS: 'http://localhost:5173' })).not.toThrow();
+  });
+
   it('normalises several origins to scheme://host[:port]', () => {
     const env = loadEnv({ ...valid, WEB_ORIGINS: 'http://localhost:5173/, https://tatamap.fr/x' });
     expect(env.WEB_ORIGINS).toEqual(['http://localhost:5173', 'https://tatamap.fr']);
