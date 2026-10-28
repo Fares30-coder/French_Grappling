@@ -5,7 +5,7 @@ import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import { FighterMesh, type FighterMeshHandle } from './FighterMesh';
 import { interpolatePose } from './interpolate';
 import { Tatami } from './Tatami';
-import { buildTimeline, DEFAULT_HOLD_MS, sampleTimeline, timeAtStep } from './timeline';
+import { buildTimeline, DEFAULT_HOLD_MS, isStepEcho, sampleTimeline, timeAtStep } from './timeline';
 
 export type ViewerStep = { pose: CurrentPose; transitionMs: number };
 
@@ -60,8 +60,8 @@ function Scene({
   const elapsedRef = useRef(0);
   // Step currently shown / highlighted, as far as this component knows.
   const shownStepRef = useRef<number | null>(null);
-  // Indexes emitted through onStepChange that the parent has not echoed back yet.
-  const pendingEmitsRef = useRef<number[]>([]);
+  // Last index emitted through onStepChange (only tracked when a listener exists).
+  const lastEmittedRef = useRef<number | null>(null);
   const onStepChangeRef = useRef(onStepChange);
   onStepChangeRef.current = onStepChange;
 
@@ -73,13 +73,8 @@ function Scene({
   // `stepIndex` changed from outside (or first mount): jump to that step. Echoes of our own
   // onStepChange are ignored, so there is no feedback loop.
   useLayoutEffect(() => {
-    const pending = pendingEmitsRef.current;
-    const echo = pending.indexOf(stepIndex);
-    if (shownStepRef.current !== null && echo !== -1) {
-      pending.splice(0, echo + 1);
-      return;
-    }
-    pending.length = 0;
+    if (isStepEcho(shownStepRef.current, lastEmittedRef.current, stepIndex)) return;
+    lastEmittedRef.current = null;
     shownStepRef.current = stepIndex;
     elapsedRef.current = timeAtStep(timeline, stepIndex);
     const pose = steps[stepIndex]?.pose;
@@ -106,8 +101,10 @@ function Scene({
     const entered = t > 0 ? to : from;
     if (entered !== shownStepRef.current) {
       shownStepRef.current = entered;
-      pendingEmitsRef.current.push(entered);
-      onStepChangeRef.current?.(entered);
+      if (onStepChangeRef.current) {
+        lastEmittedRef.current = entered;
+        onStepChangeRef.current(entered);
+      }
     }
   });
 

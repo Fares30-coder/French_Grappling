@@ -69,3 +69,15 @@ export function timeAtStep(timeline: Timeline, index: number): number {
   }
   return 0;
 }
+
+/**
+ * True when an incoming `stepIndex` is just the parent echoing the last index we emitted
+ * (so it must not make the viewer jump). Never true before the first pose is shown.
+ */
+export function isStepEcho(
+  shown: number | null,
+  lastEmitted: number | null,
+  incoming: number,
+): boolean {
+  return shown !== null && lastEmitted === incoming;
+}
