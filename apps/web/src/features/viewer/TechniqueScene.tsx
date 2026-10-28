@@ -1,5 +1,5 @@
 import { OrbitControls, OrthographicCamera, PerspectiveCamera } from '@react-three/drei';
-import { type ThreeEvent, useFrame, useThree } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import {
   type CurrentPose,
   DEFAULT_HOLD_MS,
@@ -50,7 +50,7 @@ export type TechniqueSceneProps = {
   cameraKey?: number;
 
   /** Editor: joint picking and highlight. Spheres are pickable only when this is set. */
-  onJointPointerDown?: (joint: JointRef, event: ThreeEvent<PointerEvent>) => void;
+  onJointPointerDown?: (joint: JointRef) => void;
   selectedJoint?: JointRef | null;
   /** Editor: translucent "onion skin" pose (e.g. previous step). Not pickable. */
   ghostPose?: CurrentPose | null;
@@ -132,19 +132,16 @@ export function TechniqueScene({
     invalidate();
   }, [ghostPose, invalidate]);
 
-  // Editor picking: forward the fighter along with the joint.
+  // Editor picking: tag the joint with its fighter.
   const pickMe = useMemo(
     () =>
-      onJointPointerDown &&
-      ((joint: JointV1_11, event: ThreeEvent<PointerEvent>) =>
-        onJointPointerDown({ fighter: 'me', joint }, event)),
+      onJointPointerDown && ((joint: JointV1_11) => onJointPointerDown({ fighter: 'me', joint })),
     [onJointPointerDown],
   );
   const pickOpponent = useMemo(
     () =>
       onJointPointerDown &&
-      ((joint: JointV1_11, event: ThreeEvent<PointerEvent>) =>
-        onJointPointerDown({ fighter: 'opponent', joint }, event)),
+      ((joint: JointV1_11) => onJointPointerDown({ fighter: 'opponent', joint })),
     [onJointPointerDown],
   );
 

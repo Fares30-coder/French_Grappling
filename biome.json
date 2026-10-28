@@ -17,7 +17,35 @@
   "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "linter": {
     "enabled": true,
-    "rules": { "preset": "recommended" },
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "paths": {
+              "three": "3D boundary (ADR 0004): import three only in features/viewer, editor 3D children or features/dev.",
+              "@react-three/fiber": "3D boundary (ADR 0004): use TechniqueViewer and its props instead.",
+              "@react-three/drei": "3D boundary (ADR 0004): use TechniqueViewer and its props instead."
+            },
+            "patterns": [
+              { "group": ["three/**", "@react-three/**"], "message": "3D boundary (ADR 0004)." }
+            ]
+          }
+        }
+      }
+    },
     "domains": { "react": "recommended" }
-  }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "apps/web/src/features/viewer/**",
+        "apps/web/src/features/dev/**",
+        "apps/web/src/features/admin/editor/JointGizmo.tsx",
+        "apps/web/src/features/admin/editor/CameraCapture.tsx"
+      ],
+      "linter": { "rules": { "style": { "noRestrictedImports": "off" } } }
+    }
+  ]
 }

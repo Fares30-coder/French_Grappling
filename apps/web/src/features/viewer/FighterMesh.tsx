@@ -29,7 +29,7 @@ type Props = {
   /** 'ghost': translucent "onion skin", never pickable. */
   variant?: 'solid' | 'ghost';
   /** Editor: when set, joint spheres are pickable. Absent on the public site (no picking, no hand cursor). */
-  onJointPointerDown?: (joint: JointV1_11, event: ThreeEvent<PointerEvent>) => void;
+  onJointPointerDown?: (joint: JointV1_11) => void;
   /** Editor: joint of this fighter to highlight. */
   selectedJoint?: JointV1_11 | null;
 };
@@ -97,7 +97,7 @@ export function FighterMesh({
           ? {
               onPointerDown: (event: ThreeEvent<PointerEvent>) => {
                 event.stopPropagation();
-                onJointPointerDown?.(joint, event);
+                onJointPointerDown?.(joint);
               },
               onPointerOver: (event: ThreeEvent<PointerEvent>) => {
                 event.stopPropagation();
