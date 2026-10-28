@@ -1,6 +1,11 @@
 import { OrbitControls, OrthographicCamera, PerspectiveCamera } from '@react-three/drei';
-import { useFrame, useThree } from '@react-three/fiber';
-import { type CurrentPose, DEFAULT_HOLD_MS } from '@tatamap/shared';
+import { type ThreeEvent, useFrame, useThree } from '@react-three/fiber';
+import {
+  type CurrentPose,
+  DEFAULT_HOLD_MS,
+  type FighterId,
+  type JointV1_11,
+} from '@tatamap/shared';
 import {
   type ElementRef,
   type ReactNode,
@@ -21,6 +26,7 @@ import { buildTimeline, isStepEcho, sampleTimeline, timeAtStep } from './timelin
 export type { ViewPreset } from './camera';
 
 export type ViewerStep = { pose: CurrentPose; transitionMs: number };
+export type JointRef = { fighter: FighterId; joint: JointV1_11 };
 
 export type TechniqueSceneProps = {
   steps: ReadonlyArray<ViewerStep>;
@@ -42,6 +48,12 @@ export type TechniqueSceneProps = {
   view?: ViewPreset;
   /** Bump to re-apply the current step's camera (e.g. "Recentrer"). */
   cameraKey?: number;
+
+  /** Editor: joint picking and highlight. Spheres are pickable only when this is set. */
+  onJointPointerDown?: (joint: JointRef, event: ThreeEvent<PointerEvent>) => void;
+  selectedJoint?: JointRef | null;
+  /** Editor: translucent "onion skin" pose (e.g. previous step). Not pickable. */
+  ghostPose?: CurrentPose | null;
 
   /** Extra 3D content rendered inside the scene (TransformControls, camera capture...). */
   children?: ReactNode;
@@ -65,10 +77,15 @@ export function TechniqueScene({
   onStepChange,
   view = 'step',
   cameraKey = 0,
+  onJointPointerDown,
+  selectedJoint = null,
+  ghostPose = null,
   children,
 }: TechniqueSceneProps) {
   const meRef = useRef<FighterMeshHandle>(null);
   const opponentRef = useRef<FighterMeshHandle>(null);
+  const ghostMeRef = useRef<FighterMeshHandle>(null);
+  const ghostOpponentRef = useRef<FighterMeshHandle>(null);
   const timeline = useMemo(() => buildTimeline(steps, { holdMs }), [steps, holdMs]);
   const invalidate = useThree((s) => s.invalidate);
 
@@ -107,6 +124,29 @@ export function TechniqueScene({
     const pose = steps[stepIndex]?.pose;
     if (pose) applyPose(pose);
   }, [stepIndex, timeline, steps, playing, applyPose]);
+
+  useLayoutEffect(() => {
+    if (!ghostPose) return;
+    ghostMeRef.current?.setPose(ghostPose.fighters.me);
+    ghostOpponentRef.current?.setPose(ghostPose.fighters.opponent);
+    invalidate();
+  }, [ghostPose, invalidate]);
+
+  // Editor picking: forward the fighter along with the joint.
+  const pickMe = useMemo(
+    () =>
+      onJointPointerDown &&
+      ((joint: JointV1_11, event: ThreeEvent<PointerEvent>) =>
+        onJointPointerDown({ fighter: 'me', joint }, event)),
+    [onJointPointerDown],
+  );
+  const pickOpponent = useMemo(
+    () =>
+      onJointPointerDown &&
+      ((joint: JointV1_11, event: ThreeEvent<PointerEvent>) =>
+        onJointPointerDown({ fighter: 'opponent', joint }, event)),
+    [onJointPointerDown],
+  );
 
   useFrame((_, delta) => {
     if (!playing || steps.length === 0) return;
@@ -174,8 +214,24 @@ export function TechniqueScene({
       <ambientLight intensity={0.7} />
       <directionalLight position={[200, 400, 300]} intensity={1.6} />
       <Tatami />
-      <FighterMesh fighter="me" ref={meRef} />
-      <FighterMesh fighter="opponent" ref={opponentRef} />
+      <FighterMesh
+        fighter="me"
+        ref={meRef}
+        onJointPointerDown={pickMe}
+        selectedJoint={selectedJoint?.fighter === 'me' ? selectedJoint.joint : null}
+      />
+      <FighterMesh
+        fighter="opponent"
+        ref={opponentRef}
+        onJointPointerDown={pickOpponent}
+        selectedJoint={selectedJoint?.fighter === 'opponent' ? selectedJoint.joint : null}
+      />
+      {ghostPose && (
+        <>
+          <FighterMesh fighter="me" variant="ghost" ref={ghostMeRef} />
+          <FighterMesh fighter="opponent" variant="ghost" ref={ghostOpponentRef} />
+        </>
+      )}
       {interactive && (
         <OrbitControls
           ref={setControls}
