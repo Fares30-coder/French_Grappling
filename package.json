@@ -11,7 +11,9 @@
     "typecheck": "pnpm -r typecheck",
     "lint": "biome ci .",
     "format": "biome check --write .",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test",
+    "db:up": "docker compose up -d --wait db",
+    "db:down": "docker compose down"
   },
   "devDependencies": {
     "@biomejs/biome": "~2.6.3"
