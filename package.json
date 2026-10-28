@@ -13,7 +13,10 @@
     "format": "biome check --write .",
     "test": "pnpm -r test",
     "db:up": "docker compose up -d --wait db",
-    "db:down": "docker compose down"
+    "db:down": "docker compose down",
+    "db:generate": "pnpm --filter @tatamap/api exec prisma generate",
+    "db:migrate": "pnpm --filter @tatamap/api exec prisma migrate dev",
+    "db:reset": "pnpm --filter @tatamap/api exec prisma migrate reset --force"
   },
   "devDependencies": {
     "@biomejs/biome": "~2.6.3"

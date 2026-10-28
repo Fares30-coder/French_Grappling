@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Category {
+  submission
+  pass
+  sweep
+  escape
+  takedown
+}
+
+enum Level {
+  beginner
+  intermediate
+  advanced
+}
+
+enum GiMode {
+  gi
+  nogi
+  both
+}
+
+enum PositionRole {
+  top
+  bottom
+  neutral
+}
+
+enum TechniqueStatus {
+  draft
+  published
+}
+
+enum ChainType {
+  followup
+  counter
+  alternative
+}
+
+/// A node of the position map (e.g. "Garde fermée"). Role is from `me`'s point of view.
+model Position {
+  id          String       @id @default(uuid(7)) @db.Uuid
+  slug        String       @unique
+  name        String
+  description String       @default("")
+  role        PositionRole
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  techniquesFrom Technique[] @relation("TechniqueStart")
+  techniquesTo   Technique[] @relation("TechniqueEnd")
+}
+
+/// An edge of the position map: startPosition -> endPosition (null for a submission).
+model Technique {
+  id             String          @id @default(uuid(7)) @db.Uuid
+  slug           String          @unique
+  name           String
+  category       Category
+  level          Level
+  gi             GiMode
+  status         TechniqueStatus @default(draft)
+  keyPoints      String[]
+  commonMistakes String[]
+
+  startPositionId String    @db.Uuid
+  startPosition   Position  @relation("TechniqueStart", fields: [startPositionId], references: [id], onDelete: Restrict)
+  endPositionId   String?   @db.Uuid
+  endPosition     Position? @relation("TechniqueEnd", fields: [endPositionId], references: [id], onDelete: Restrict)
+
+  steps      Step[]
+  tags       Tag[]
+  chainsFrom Chain[] @relation("ChainFrom")
+  chainsTo   Chain[] @relation("ChainTo")
+
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status, category])
+  @@index([startPositionId])
+  @@index([endPositionId])
+}
+
+/// One keyframe of a technique. `pose` is a Pose document validated by @tatamap/shared;
+/// `skeleton` mirrors pose.skeleton so outdated poses can be found without parsing JSON.
+model Step {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  techniqueId  String    @db.Uuid
+  technique    Technique @relation(fields: [techniqueId], references: [id], onDelete: Cascade)
+  order        Int
+  title        String
+  text         String    @default("")
+  transitionMs Int       @default(1300)
+  skeleton     String
+  pose         Json
+
+  @@unique([techniqueId, order])
+}
+
+/// Technique-to-technique link (follow-up, counter, alternative).
+model Chain {
+  id     String    @id @default(uuid(7)) @db.Uuid
+  fromId String    @db.Uuid
+  from   Technique @relation("ChainFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  toId   String    @db.Uuid
+  to     Technique @relation("ChainTo", fields: [toId], references: [id], onDelete: Cascade)
+  type   ChainType
+
+  @@unique([fromId, toId, type])
+  @@index([toId])
+}
+
+model Tag {
+  id         String      @id @default(uuid(7)) @db.Uuid
+  slug       String      @unique
+  name       String
+  techniques Technique[]
+}
+
+model Admin {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
