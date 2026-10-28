@@ -12,6 +12,7 @@
     "lint": "biome ci .",
     "format": "biome check --write .",
     "test": "pnpm -r test",
+    "admin:create": "pnpm --filter @tatamap/api exec tsx scripts/create-admin.ts",
     "db:up": "docker compose up -d --wait db",
     "db:down": "docker compose down",
     "db:generate": "pnpm --filter @tatamap/api exec prisma generate",
