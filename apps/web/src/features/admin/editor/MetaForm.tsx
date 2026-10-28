@@ -10,8 +10,10 @@ import {
   LEVELS,
   type Level,
 } from '@tatamap/shared';
+import { useState } from 'react';
 import { PositionSelect } from '../PositionSelect';
 import type { EditorTechnique, MetaPatch } from './editor-state';
+import { PositionDialog } from './PositionDialog';
 import { StringListEditor } from './StringListEditor';
 import type { FieldErrors } from './validation';
 
@@ -25,7 +27,16 @@ type Props = {
 
 const field = 'mt-1 w-full rounded border border-slate-300 px-3 py-2';
 
+type PositionDialogState =
+  | { mode: 'create'; target: 'start' | 'end' }
+  | { mode: 'edit'; target: 'start' | 'end'; position: AdminPosition };
+
 export function MetaForm({ technique, positions, published, errors, onChange }: Props) {
+  const [dialog, setDialog] = useState<PositionDialogState | null>(null);
+  const edit = (target: 'start' | 'end', id: string | null) => {
+    const position = positions.find((p) => p.id === id);
+    if (position) setDialog({ mode: 'edit', target, position });
+  };
   const isSubmission = technique.category === 'submission';
   return (
     <section className="space-y-3" aria-label="Informations">
@@ -108,6 +119,8 @@ export function MetaForm({ technique, positions, published, errors, onChange }: 
           positions={positions}
           error={errors.startPositionId}
           onChange={(id) => id && onChange({ startPositionId: id })}
+          onCreate={() => setDialog({ mode: 'create', target: 'start' })}
+          onEdit={() => edit('start', technique.startPositionId)}
         />
         <PositionSelect
           label="Position d'arrivée"
@@ -117,6 +130,8 @@ export function MetaForm({ technique, positions, published, errors, onChange }: 
           allowNone
           error={errors.endPositionId}
           onChange={(id) => onChange({ endPositionId: id })}
+          onCreate={() => setDialog({ mode: 'create', target: 'end' })}
+          onEdit={() => edit('end', technique.endPositionId)}
         />
       </div>
       {isSubmission && (
@@ -139,6 +154,22 @@ export function MetaForm({ technique, positions, published, errors, onChange }: 
         errors={errors}
         onChange={(commonMistakes) => onChange({ commonMistakes })}
       />
+      {dialog && (
+        <PositionDialog
+          {...(dialog.mode === 'edit' ? { position: dialog.position } : {})}
+          onClose={() => setDialog(null)}
+          // A new position is selected right away in the select it was created from.
+          onSaved={(saved) => {
+            if (dialog.mode === 'create') {
+              onChange(
+                dialog.target === 'start'
+                  ? { startPositionId: saved.id }
+                  : { endPositionId: saved.id },
+              );
+            }
+          }}
+        />
+      )}
     </section>
   );
 }

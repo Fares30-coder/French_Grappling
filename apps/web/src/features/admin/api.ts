@@ -1,11 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  type AdminPosition,
   type AdminSession,
   adminPositionListSchema,
+  adminPositionSchema,
   adminSessionSchema,
+  adminTagListSchema,
+  adminTagSchema,
   adminTechniqueListSchema,
   adminTechniqueSchema,
   type LoginInput,
+  type PositionInput,
+  type TagInput,
   type TechniqueCreateInput,
   type TechniqueUpdateInput,
 } from '@tatamap/shared';
@@ -137,6 +143,45 @@ export function useSaveTechnique(id: string) {
     onSuccess: (technique) => {
       queryClient.setQueryData(techniqueKey(id), technique);
       return queryClient.invalidateQueries({ queryKey: TECHNIQUES_KEY });
+    },
+  });
+}
+
+const TAGS_KEY = ['admin', 'tags'] as const;
+
+export function useAdminTags() {
+  return useQuery({
+    queryKey: TAGS_KEY,
+    queryFn: ({ signal }) => apiRequest('/api/admin/tags', adminTagListSchema, { signal }),
+    ...adminQueryDefaults,
+  });
+}
+
+export function useCreateTag() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: TagInput) =>
+      apiRequest('/api/admin/tags', adminTagSchema, { method: 'POST', body: input }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: TAGS_KEY }),
+  });
+}
+
+/** Creates a position (no `id`) or renames/edits one (`id`). */
+export function useSavePosition() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id?: string; input: PositionInput }) =>
+      apiRequest(id ? `/api/admin/positions/${id}` : '/api/admin/positions', adminPositionSchema, {
+        method: id ? 'PUT' : 'POST',
+        body: input,
+      }),
+    // The select needs the new position right away, before the refetch finishes.
+    onSuccess: async (position) => {
+      queryClient.setQueryData(POSITIONS_KEY, (old: AdminPosition[] | undefined) =>
+        old ? [...old.filter((p) => p.id !== position.id), position] : [position],
+      );
+      await queryClient.invalidateQueries({ queryKey: POSITIONS_KEY });
+      await queryClient.invalidateQueries({ queryKey: TECHNIQUES_KEY }); // start position names
     },
   });
 }

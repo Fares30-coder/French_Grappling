@@ -9,6 +9,10 @@ type Props = {
   /** Offers an empty choice (end position of a submission). */
   allowNone?: boolean;
   error?: string | undefined;
+  /** Opens the creation dialog. */
+  onCreate?: () => void;
+  /** Opens the edit dialog for the selected position. */
+  onEdit?: () => void;
 };
 
 export function PositionSelect({
@@ -19,6 +23,8 @@ export function PositionSelect({
   disabled = false,
   allowNone = false,
   error,
+  onCreate,
+  onEdit,
 }: Props) {
   return (
     <label className="block">
@@ -37,6 +43,20 @@ export function PositionSelect({
         ))}
       </select>
       {error && <span className="text-sm text-red-700">{error}</span>}
+      {(onCreate || onEdit) && (
+        <span className="mt-1 flex gap-3 text-sm">
+          {onCreate && (
+            <button type="button" className="underline" disabled={disabled} onClick={onCreate}>
+              + Nouvelle position
+            </button>
+          )}
+          {onEdit && value !== null && (
+            <button type="button" className="underline" onClick={onEdit}>
+              Modifier
+            </button>
+          )}
+        </span>
+      )}
     </label>
   );
 }

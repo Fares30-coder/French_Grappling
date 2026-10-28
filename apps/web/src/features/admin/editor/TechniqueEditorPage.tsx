@@ -7,6 +7,7 @@ import { TechniqueViewer } from '../../viewer/TechniqueViewer';
 import { isUnauthorized, useAdminPositions, useAdminTechnique, useSaveTechnique } from '../api';
 import { adminErrorMessage } from '../errors';
 import { CameraCapture } from './CameraCapture';
+import { ChainsEditor } from './ChainsEditor';
 import {
   currentWarnings,
   type EditorAction,
@@ -20,6 +21,7 @@ import { JointPanel } from './JointPanel';
 import { MetaForm } from './MetaForm';
 import { PoseTools } from './PoseTools';
 import { StepsPanel } from './StepsPanel';
+import { TagsPicker } from './TagsPicker';
 import { useUnsavedGuard } from './use-unsaved-guard';
 import { validateUpdateInput } from './validation';
 
@@ -329,13 +331,26 @@ function TechniqueEditor({
             />
           </div>
         </div>
-        <MetaForm
-          technique={state.technique}
-          positions={positions.data ?? []}
-          published={published}
-          errors={errors}
-          onChange={(patch) => dispatch({ type: 'setMeta', patch })}
-        />
+        <div className="space-y-6">
+          <MetaForm
+            technique={state.technique}
+            positions={positions.data ?? []}
+            published={published}
+            errors={errors}
+            onChange={(patch) => dispatch({ type: 'setMeta', patch })}
+          />
+          <TagsPicker
+            selected={state.technique.tagIds}
+            error={errors.tagIds}
+            onChange={(tagIds) => dispatch({ type: 'setMeta', patch: { tagIds } })}
+          />
+          <ChainsEditor
+            currentId={loaded.id}
+            chains={state.technique.chains}
+            error={errors.chains}
+            onChange={(chains) => dispatch({ type: 'setMeta', patch: { chains } })}
+          />
+        </div>
       </div>
     </main>
   );
