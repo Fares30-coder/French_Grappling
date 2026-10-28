@@ -438,6 +438,8 @@ export const adminTechniqueListSchema = z.array(adminTechniqueListItemSchema);
 export type AdminTechniqueListItem = z.infer<typeof adminTechniqueListItemSchema>;
 ```
 
+*Ajout en P2-T27 :* `adminTechniqueListItemSchema` porte aussi `level` et `gi`, pour que l'aperçu puisse résoudre les cibles d'enchaînement en résumés publics sans requête supplémentaire.
+
 (Si le générique de `withContentRules` pose problème de typage avec Zod 4, l'écrire sous forme de deux appels explicites : l'important est que les trois prédicats viennent des mêmes fonctions.)
 
 ```ts
