@@ -1,9 +1,15 @@
+import fastifyCookie from '@fastify/cookie';
 import fastifyHelmet from '@fastify/helmet';
+import fastifyJwt from '@fastify/jwt';
+import fastifyRateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
+import { adminPlugin } from './auth/admin-plugin';
 import { registerOriginCheck } from './auth/origin-check';
+import { warmUpPasswordHashing } from './auth/password';
 import type { AppConfig } from './config';
 import { registerErrorHandlers } from './errors';
 import type { PrismaClient } from './generated/prisma/client';
+import { registerAuthRoutes } from './routes/auth';
 import { registerHealthRoutes } from './routes/health';
 import { registerTechniqueRoutes } from './routes/techniques';
 
@@ -36,6 +42,21 @@ export async function buildApp({ prisma, config, logStream }: AppDeps): Promise<
     crossOriginResourcePolicy: { policy: 'same-site' },
   });
   registerOriginCheck(app, config.webOrigins);
+
+  await app.register(fastifyCookie);
+  // expiresIn is a string on purpose: a number would be read as milliseconds by fast-jwt.
+  await app.register(fastifyJwt, {
+    secret: config.jwtSecret,
+    sign: { algorithm: 'HS256', expiresIn: '2h', iss: 'tatamap-api', aud: 'tatamap-admin' },
+    verify: { algorithms: ['HS256'], allowedIss: 'tatamap-api', allowedAud: 'tatamap-admin' },
+    cookie: { cookieName: config.cookieName, signed: false },
+  });
+  // Not global: only the routes that opt in (login) are limited. In-memory store (single process).
+  await app.register(fastifyRateLimit, { global: false });
+  await warmUpPasswordHashing();
+
+  registerAuthRoutes(app, { prisma, config });
+  await app.register(adminPlugin, { prefix: '/api/admin', prisma, config });
   registerHealthRoutes(app);
   registerTechniqueRoutes(app, prisma);
   return app;
