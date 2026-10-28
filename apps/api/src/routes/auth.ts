@@ -1,5 +1,6 @@
 import { adminSessionSchema, loginInputSchema } from '@tatamap/shared';
 import type { FastifyInstance } from 'fastify';
+import { createLoginLimiter } from '../auth/login-limiter';
 import { verifyPassword } from '../auth/password';
 import { authenticate, clearSession, issueSession } from '../auth/session';
 import type { AppConfig } from '../config';
@@ -13,6 +14,7 @@ export function registerAuthRoutes(
   app: FastifyInstance,
   { prisma, config }: { prisma: PrismaClient; config: AppConfig },
 ): void {
+  const accountLimiter = createLoginLimiter();
   app.post(
     '/api/auth/login',
     { config: { rateLimit: { max: LOGIN_MAX_ATTEMPTS, timeWindow: LOGIN_WINDOW } } },
@@ -22,10 +24,19 @@ export function registerAuthRoutes(
       const input = loginInputSchema.safeParse(request.body);
       if (!input.success) return sendApiError(reply, 400, 'bad_request', 'Invalid request');
 
+      // Same answer as the per-IP limit, whether or not the account exists.
+      if (accountLimiter.isBlocked(input.data.email)) {
+        return sendApiError(reply, 429, 'rate_limited', 'Invalid request');
+      }
+
       const admin = await prisma.admin.findUnique({ where: { email: input.data.email } });
       // Verified against a dummy hash when the email is unknown: same cost, same answer.
       const ok = await verifyPassword(admin?.passwordHash ?? null, input.data.password);
-      if (!admin || !ok) return sendApiError(reply, 401, 'unauthorized', 'Invalid credentials');
+      if (!admin || !ok) {
+        accountLimiter.recordFailure(input.data.email);
+        return sendApiError(reply, 401, 'unauthorized', 'Invalid credentials');
+      }
+      accountLimiter.reset(input.data.email);
 
       issueSession(app, reply, config, admin);
       return adminSessionSchema.parse({ email: admin.email });

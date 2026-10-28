@@ -13,6 +13,7 @@ import {
   sessionCookie,
   testConfig,
 } from '../test-utils';
+import { createLoginLimiter } from './login-limiter';
 
 const prisma = createPrisma(process.env.DATABASE_URL ?? '');
 const admin = await createTestAdmin(prisma);
@@ -182,6 +183,57 @@ describe('POST /api/auth/login', () => {
 
     const trusted = await newApp({ trustProxy: 1 });
     for (let i = 1; i <= 6; i++) expect((await spoofed(trusted, i)).statusCode).toBe(401);
+  });
+});
+
+describe('per-account login limit', () => {
+  // trustProxy 1 + a distinct X-Forwarded-For per request: the per-IP limit never triggers.
+  const attempt = (app: FastifyInstance, i: number, email: string, password: string) =>
+    loginRequest(app, { email, password }, { 'x-forwarded-for': `10.1.${i >> 8}.${i & 255}` });
+
+  it('answers 429 after 20 failures on one email, whatever the IP, with the generic body', async () => {
+    const app = await newApp({ trustProxy: 1 });
+    const email = 'ghost@example.test'; // unknown account: counted all the same
+    for (let i = 0; i < 20; i++) {
+      expect((await attempt(app, i, email, 'wrong-password-1')).statusCode).toBe(401);
+    }
+    const blocked = await attempt(app, 20, email, 'wrong-password-1');
+    expect(blocked.statusCode).toBe(429);
+    expect(apiErrorSchema.parse(blocked.json()).error.code).toBe('rate_limited');
+    // An unrelated email is not affected.
+    expect((await attempt(app, 21, 'other@example.test', 'x')).statusCode).toBe(401);
+
+    // Same body as the per-IP limit, so the answer reveals nothing about the account.
+    const byIp = await newApp();
+    for (let i = 0; i < 5; i++) await loginRequest(byIp, { email, password: 'x' });
+    const ipLimited = await loginRequest(byIp, { email, password: 'x' });
+    expect(ipLimited.statusCode).toBe(429);
+    expect(blocked.json()).toEqual(ipLimited.json());
+  });
+
+  it('blocks even the right password once the account has used its failures', async () => {
+    const app = await newApp({ trustProxy: 1 });
+    for (let i = 0; i < 20; i++) await attempt(app, i, admin.email, 'wrong-password-1');
+    expect((await attempt(app, 20, admin.email, admin.password)).statusCode).toBe(429);
+  });
+
+  it('forgets earlier failures after a successful login', async () => {
+    const app = await newApp({ trustProxy: 1 });
+    for (let i = 0; i < 19; i++) await attempt(app, i, admin.email, 'wrong-password-1');
+    expect((await attempt(app, 19, admin.email, admin.password)).statusCode).toBe(200);
+    for (let i = 20; i < 39; i++) await attempt(app, i, admin.email, 'wrong-password-1');
+    expect((await attempt(app, 39, admin.email, admin.password)).statusCode).toBe(200);
+  });
+});
+
+describe('createLoginLimiter', () => {
+  it('blocks at the threshold and expires failures after the window', () => {
+    let t = 0;
+    const limiter = createLoginLimiter(() => t, 3, 1000);
+    for (let i = 0; i < 3; i++) limiter.recordFailure('a@x.test');
+    expect(limiter.isBlocked('a@x.test')).toBe(true);
+    t = 1001;
+    expect(limiter.isBlocked('a@x.test')).toBe(false);
   });
 });
 
