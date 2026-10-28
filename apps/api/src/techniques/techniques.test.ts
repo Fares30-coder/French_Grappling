@@ -53,6 +53,40 @@ describe('GET /api/techniques/:slug', () => {
     }
   });
 
+  it('returns 500 (not 400) when a stored pose is corrupted', async () => {
+    const source = await prisma.technique.findUniqueOrThrow({
+      where: { slug: 'ciseau-garde-fermee' },
+      include: { steps: { orderBy: { order: 'asc' }, take: 1 } },
+    });
+    const pose = structuredClone(source.steps[0]?.pose) as {
+      fighters: { me: { head: number[] } };
+    };
+    pose.fighters.me.head = [0, 9999, 0]; // y out of bounds
+    const corrupted = await prisma.technique.create({
+      data: {
+        slug: 'pose-corrompue-test',
+        name: 'Pose corrompue de test',
+        category: 'submission',
+        level: 'beginner',
+        gi: 'both',
+        status: 'published',
+        startPositionId: source.startPositionId,
+        steps: {
+          create: { order: 1, title: 'Etape', skeleton: 'v1-11', pose },
+        },
+      },
+    });
+    try {
+      const res = await app.inject({ method: 'GET', url: '/api/techniques/pose-corrompue-test' });
+      expect(res.statusCode).toBe(500);
+      const parsed = apiErrorSchema.parse(res.json());
+      expect(parsed.error.code).toBe('internal');
+      expect(res.body).not.toMatch(/9999/);
+    } finally {
+      await prisma.technique.delete({ where: { id: corrupted.id } });
+    }
+  });
+
   it('returns 400 for an invalid slug', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/techniques/Pas_Un_Slug' });
     expect(res.statusCode).toBe(400);

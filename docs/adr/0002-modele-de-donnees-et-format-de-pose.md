@@ -1,6 +1,6 @@
 # ADR 0002 — Modèle de données et format de pose
 
-- Statut : proposé
+- Statut : accepté
 - Date : 2026-10-28
 - Auteur : agent architecte (pour Fares Haouari)
 - Dépend de : ADR 0001 (Prisma 7.10.1, Zod 4, `@tatamap/shared` consommé en source)

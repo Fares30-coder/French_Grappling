@@ -6,7 +6,16 @@ export const slugSchema = z
   .max(100)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'invalid slug');
 
-export const API_ERROR_CODES = ['bad_request', 'not_found', 'internal'] as const;
+export const API_ERROR_CODES = [
+  'bad_request',
+  'unauthorized',
+  'forbidden',
+  'not_found',
+  'conflict',
+  'payload_too_large',
+  'rate_limited',
+  'internal',
+] as const;
 export const apiErrorSchema = z.strictObject({
   error: z.strictObject({
     code: z.enum(API_ERROR_CODES),

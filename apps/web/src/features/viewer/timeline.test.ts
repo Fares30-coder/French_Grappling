@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildTimeline, sampleTimeline, timeAtStep } from './timeline';
+import { buildTimeline, isStepEcho, sampleTimeline, timeAtStep } from './timeline';
 
 const steps = [1300, 1300, 1300, 1300, 1300].map((transitionMs) => ({ transitionMs }));
 const timeline = buildTimeline(steps);
@@ -89,5 +89,17 @@ describe('timeAtStep', () => {
     for (let i = 0; i < 5; i++) {
       expect(sampleTimeline(timeline, timeAtStep(timeline, i), { loop: true }).stepIndex).toBe(i);
     }
+  });
+});
+
+describe('isStepEcho', () => {
+  it('ignores the incoming index only when it equals the last emitted one', () => {
+    expect(isStepEcho(1, 2, 2)).toBe(true);
+    expect(isStepEcho(1, 2, 0)).toBe(false);
+    expect(isStepEcho(1, null, 2)).toBe(false);
+  });
+
+  it('never ignores the very first index', () => {
+    expect(isStepEcho(null, 0, 0)).toBe(false);
   });
 });

@@ -1,4 +1,8 @@
 name: CI
+
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
@@ -26,9 +30,11 @@ jobs:
     env:
       DATABASE_URL: postgresql://tatamap:tatamap@localhost:5432/tatamap
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6 # reads "packageManager" from package.json
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6 - reads "packageManager" from package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
           cache: pnpm

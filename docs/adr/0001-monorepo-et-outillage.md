@@ -1,6 +1,6 @@
 # ADR 0001 — Monorepo et outillage
 
-- Statut : proposé
+- Statut : accepté
 - Date : 2026-10-28
 - Auteur : agent architecte (pour Fares Haouari)
 - Portée : phase 1 (socle), avec les phases 2 à 4 en ligne de mire
