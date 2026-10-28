@@ -42,8 +42,8 @@ const spec: FighterSpec = {
     R: { target: [20, 60, -30], pole: [0, 1, -1] },
   },
   feet: {
-    L: { target: [30, 0, 20], pole: [1, 1, 0] },
-    R: { target: [30, 0, -20], pole: [1, 1, 0] },
+    L: { target: [30, 6, 20], pole: [1, 1, 0] },
+    R: { target: [30, 6, -20], pole: [1, 1, 0] },
   },
 };
 

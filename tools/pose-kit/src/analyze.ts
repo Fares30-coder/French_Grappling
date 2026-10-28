@@ -11,19 +11,23 @@ import {
 } from '@tatamap/shared';
 import { add, dot, length, scale, sub } from './vec';
 
+/** Radius of the joint spheres in the viewer (FighterMesh.tsx). */
+export const JOINT_RADIUS_CM = 5;
+
 /**
- * Joints under the mat (y < -`toleranceCm`), and heads sunk into it: the head is a sphere of
- * HEAD_RADIUS_CM, so a head centre lower than that digs into the mat. The mat is at y = 0.
+ * Joints that sink into the mat (y = 0): a joint is a sphere (radius JOINT_RADIUS_CM, the head
+ * HEAD_RADIUS_CM), so a centre lower than that minus `toleranceCm` is partly hidden by the mat,
+ * which shows as clipped hands and feet in the viewer. Rest joints at y >= 6.
  */
 export function jointsBelowMat(
   pose: CurrentPose,
-  toleranceCm = 0.5,
+  toleranceCm = 1,
 ): Array<{ fighter: FighterId; joint: JointV1_11; y: number }> {
   const out: Array<{ fighter: FighterId; joint: JointV1_11; y: number }> = [];
   for (const fighter of FIGHTERS) {
     for (const joint of JOINTS_V1_11) {
       const y = pose.fighters[fighter][joint][1];
-      const floor = joint === 'head' ? HEAD_RADIUS_CM - 1 : -toleranceCm;
+      const floor = (joint === 'head' ? HEAD_RADIUS_CM : JOINT_RADIUS_CM) - toleranceCm;
       if (y < floor) out.push({ fighter, joint, y });
     }
   }

@@ -25,10 +25,13 @@ export function reportTechnique(technique: ContentTechnique): StepReport[] {
             }${Math.round((Math.abs(w.lengthCm - w.referenceCm) / w.referenceCm) * 100)} %)`,
         )
       : [],
-    underMat: jointsBelowMat(step.pose).map((j) =>
-      j.joint === 'head'
-        ? `${j.fighter} head: centre at y=${j.y.toFixed(1)}, the head sphere sinks into the mat`
-        : `${j.fighter} ${j.joint}: y=${j.y.toFixed(1)} (under the mat)`,
+    underMat: jointsBelowMat(step.pose).map(
+      (j) =>
+        `${j.fighter} ${j.joint}: y=${j.y.toFixed(1)}, ${
+          j.y < 0
+            ? 'under the mat'
+            : `sinks into the mat (partly hidden, keep >= ${j.joint === 'head' ? 14 : 6} cm)`
+        }`,
     ),
     contacts: findContacts(step.pose).map(
       (c) => `${c.between}: ${cm(c.distanceCm)} (< ${c.thresholdCm} cm)`,
