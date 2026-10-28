@@ -1,6 +1,7 @@
 import 'dotenv/config';
-import { currentPoseSchema, DEFAULT_TRANSITION_MS } from '@tatamap/shared';
+import { currentPoseSchema, DEFAULT_TRANSITION_MS, type StepInput } from '@tatamap/shared';
 import { createPrisma } from '../src/db';
+import { toStepCreateData } from '../src/techniques/step-data';
 import {
   buildScissorPoses,
   SEED_POSITIONS,
@@ -52,17 +53,13 @@ async function main() {
     });
 
     await tx.step.deleteMany({ where: { techniqueId: technique.id } });
-    await tx.step.createMany({
-      data: poses.map((pose, i) => ({
-        techniqueId: technique.id,
-        order: i + 1,
-        title: STEP_TITLES[i] ?? '',
-        text: '',
-        transitionMs: DEFAULT_TRANSITION_MS,
-        skeleton: pose.skeleton,
-        pose,
-      })),
-    });
+    const steps: StepInput[] = poses.map((pose, i) => ({
+      title: STEP_TITLES[i] ?? '',
+      text: '',
+      transitionMs: DEFAULT_TRANSITION_MS,
+      pose,
+    }));
+    await tx.step.createMany({ data: toStepCreateData(technique.id, steps) });
   });
 }
 

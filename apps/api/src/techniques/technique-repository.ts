@@ -5,7 +5,12 @@ const publishedTechniqueInclude = {
   endPosition: true,
   tags: true,
   steps: { orderBy: { order: 'asc' } },
-  chainsFrom: { where: { to: { status: 'published' } }, include: { to: true } },
+  chainsFrom: {
+    where: { to: { status: 'published' } },
+    include: { to: true },
+    // Stable order: enum declaration order (followup, counter, alternative), then name, then id.
+    orderBy: [{ type: 'asc' }, { to: { name: 'asc' } }, { id: 'asc' }],
+  },
 } satisfies Prisma.TechniqueInclude;
 
 export type TechniqueRow = Prisma.TechniqueGetPayload<{
