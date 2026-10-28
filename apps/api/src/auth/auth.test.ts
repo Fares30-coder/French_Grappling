@@ -414,6 +414,57 @@ describe('/api/admin guard', () => {
   });
 });
 
+describe('Cache-Control on /api/auth/*', () => {
+  const post = (app: FastifyInstance, url: string, init: Record<string, unknown>) =>
+    app.inject({ method: 'POST', url, ...init });
+
+  it('is no-store whatever the status (200, 204, 400, 401, 403, 413, 415, 429)', async () => {
+    const app = await newApp();
+    const json = { origin: ORIGIN, 'content-type': 'application/json' };
+    const cases: Array<
+      [number, Promise<{ statusCode: number; headers: Record<string, unknown> }>]
+    > = [
+      [200, loginRequest(app, { email: admin.email, password: admin.password })],
+      [204, post(app, '/api/auth/logout', { headers: { origin: ORIGIN } })],
+      [400, loginRequest(app, { email: admin.email })],
+      [401, loginRequest(app, { email: admin.email, password: 'wrong-password-1' })],
+      [403, post(app, '/api/auth/login', { payload: {} })],
+      [
+        413,
+        post(app, '/api/auth/login', {
+          headers: json,
+          payload: JSON.stringify({ blob: 'x'.repeat(300 * 1024) }),
+        }),
+      ],
+      [
+        415,
+        post(app, '/api/auth/login', {
+          headers: { origin: ORIGIN, 'content-type': 'application/xml' },
+          payload: 'hello',
+        }),
+      ],
+    ];
+    for (const [status, pending] of cases) {
+      const res = await pending;
+      expect(res.statusCode, `status ${status}`).toBe(status);
+      expect(res.headers['cache-control'], `status ${status}`).toBe('no-store');
+    }
+    // Sequential on purpose for the limit: a dedicated app, 5 allowed attempts then 429.
+    const limited = await newApp();
+    let last = await loginRequest(limited, { email: 'a@example.test', password: 'x' });
+    for (let i = 0; i < 5; i++)
+      last = await loginRequest(limited, { email: 'a@example.test', password: 'x' });
+    expect(last.statusCode).toBe(429);
+    expect(last.headers['cache-control']).toBe('no-store');
+  });
+
+  it('is not added to other routes', async () => {
+    const app = await newApp();
+    const res = await app.inject({ method: 'GET', url: '/api/health' });
+    expect(res.headers['cache-control']).toBeUndefined();
+  });
+});
+
 describe('logs', () => {
   it('never contain the password or the session token', async () => {
     const lines: string[] = [];
@@ -438,5 +489,76 @@ describe('logs', () => {
     expect(logs).not.toContain(admin.password);
     expect(token.length).toBeGreaterThan(20);
     expect(logs).not.toContain(token);
+  });
+
+  it('never contain secrets for malformed JSON, text/plain, 415, 413 and a forced 500', async () => {
+    const lines: string[] = [];
+    const sink = new Writable({
+      write(chunk, _enc, done) {
+        lines.push(String(chunk));
+        done();
+      },
+    });
+    const canary = 'canary-S3cret-pw';
+    const app = await newApp({ logLevel: 'trace' }, sink);
+    const token = cookieValue(
+      (await loginRequest(app, { email: admin.email, password: admin.password })).headers[
+        'set-cookie'
+      ],
+      COOKIE,
+    ) as string;
+    const auth = { cookie: `${COOKIE}=${token}`, authorization: `Bearer ${token}` };
+    const url = '/api/auth/login';
+    const base = { origin: ORIGIN, ...auth };
+
+    const responses = [
+      await app.inject({
+        method: 'POST',
+        url,
+        headers: { ...base, 'content-type': 'application/json' },
+        payload: `{"email":"${admin.email}","password":"${canary}"`, // truncated JSON
+      }),
+      await app.inject({
+        method: 'POST',
+        url,
+        headers: { ...base, 'content-type': 'text/plain' },
+        payload: `password=${canary}`,
+      }),
+      await app.inject({
+        method: 'POST',
+        url,
+        headers: { ...base, 'content-type': 'application/xml' },
+        payload: `<password>${canary}</password>`,
+      }),
+      await app.inject({
+        method: 'POST',
+        url,
+        headers: { ...base, 'content-type': 'application/json' },
+        payload: JSON.stringify({ password: canary, blob: 'x'.repeat(300 * 1024) }),
+      }),
+    ];
+    expect(responses.map((r) => r.statusCode)).toEqual([400, 400, 415, 413]);
+
+    // Forced 500: the database fails while the login handler runs.
+    const broken = await buildTestApp(
+      // Minimal stand-in; the cast is the point of the test (a failing client).
+      {
+        admin: { findUnique: () => Promise.reject(new Error('db down')) },
+      } as unknown as Parameters<typeof buildTestApp>[0],
+      { logLevel: 'trace' },
+      sink,
+    );
+    apps.push(broken);
+    const failed = await broken.inject({
+      method: 'POST',
+      url,
+      headers: { ...base, 'content-type': 'application/json' },
+      payload: { email: admin.email, password: canary },
+    });
+    expect(failed.statusCode).toBe(500);
+
+    const logs = lines.join('');
+    expect(logs).toContain('db down'); // the capture sees the 500
+    for (const secret of [canary, admin.password, token]) expect(logs).not.toContain(secret);
   });
 });

@@ -14,3 +14,17 @@ pnpm typecheck
 pnpm test
 pnpm build
 ```
+
+## Compte admin
+
+```sh
+pnpm admin:create <email>   # demande le mot de passe deux fois, sans l'afficher
+```
+
+Relancer la commande sur le même email change le mot de passe et déconnecte les sessions ouvertes. Ne jamais écrire le mot de passe dans la ligne de commande (historique du shell, liste des processus). Si le script n'a pas de terminal et que `ADMIN_PASSWORD` est nécessaire :
+
+```sh
+read -s ADMIN_PASSWORD; export ADMIN_PASSWORD
+pnpm admin:create <email>
+unset ADMIN_PASSWORD
+```

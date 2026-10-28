@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import type { AppConfig } from './config';
 
+/** A long but repetitive secret ('aaaa...', 'abcabc...') has little entropy. */
+const MIN_DISTINCT_SECRET_CHARS = 10;
+
 const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -12,7 +15,11 @@ const envSchema = z
       .default('info'),
     JWT_SECRET: z
       .string()
-      .refine((s) => Buffer.byteLength(s, 'utf8') >= 32, 'JWT_SECRET must be at least 32 bytes'),
+      .refine((s) => Buffer.byteLength(s, 'utf8') >= 32, 'JWT_SECRET must be at least 32 bytes')
+      .refine(
+        (s) => new Set(s).size >= MIN_DISTINCT_SECRET_CHARS,
+        `JWT_SECRET is too repetitive (needs at least ${MIN_DISTINCT_SECRET_CHARS} distinct characters): generate one with \`openssl rand -base64 48\``,
+      ),
     WEB_ORIGINS: z
       .string()
       .transform((s) =>

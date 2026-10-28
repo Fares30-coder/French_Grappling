@@ -28,8 +28,9 @@ describe('app', () => {
   it('sets security headers (nosniff, CSP default-src none)', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/health' });
     expect(res.headers['x-content-type-options']).toBe('nosniff');
-    expect(res.headers['content-security-policy']).toContain("default-src 'none'");
-    expect(res.headers['content-security-policy']).toContain("frame-ancestors 'none'");
+    expect(res.headers['content-security-policy']).toBe(
+      "default-src 'none';frame-ancestors 'none'",
+    );
   });
 
   it('rejects a 300 KiB body with 413 payload_too_large', async () => {

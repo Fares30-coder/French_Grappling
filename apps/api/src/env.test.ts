@@ -3,7 +3,7 @@ import { parse } from 'dotenv';
 import { describe, expect, it } from 'vitest';
 import { loadEnv, toAppConfig } from './env';
 
-const SECRET = 'x'.repeat(48);
+const SECRET = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKL'; // 48 bytes, 48 distinct chars
 const valid = {
   DATABASE_URL: 'postgresql://u:p@localhost:5432/db',
   JWT_SECRET: SECRET,
@@ -29,8 +29,15 @@ describe('loadEnv', () => {
   });
 
   it('refuses a 31-byte JWT_SECRET and accepts 32 bytes', () => {
-    expect(() => loadEnv({ ...valid, JWT_SECRET: 'x'.repeat(31) })).toThrow(/JWT_SECRET/);
-    expect(() => loadEnv({ ...valid, JWT_SECRET: 'x'.repeat(32) })).not.toThrow();
+    expect(() => loadEnv({ ...valid, JWT_SECRET: SECRET.slice(0, 31) })).toThrow(/JWT_SECRET/);
+    expect(() => loadEnv({ ...valid, JWT_SECRET: SECRET.slice(0, 32) })).not.toThrow();
+  });
+
+  it('refuses a JWT_SECRET with too few distinct characters', () => {
+    for (const weak of ['x'.repeat(48), 'abc'.repeat(20), 'abcdefghi'.repeat(6)]) {
+      expect(() => loadEnv({ ...valid, JWT_SECRET: weak })).toThrow(/openssl rand -base64 48/);
+    }
+    expect(() => loadEnv({ ...valid, JWT_SECRET: 'abcdefghij'.repeat(5) })).not.toThrow();
   });
 
   it('refuses an empty or malformed WEB_ORIGINS', () => {

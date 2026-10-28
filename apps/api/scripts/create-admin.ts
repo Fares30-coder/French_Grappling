@@ -2,6 +2,9 @@
 // Creates the admin account, or changes its password when the email already exists.
 // The password is typed twice without echo. Without a TTY (host shell), ADMIN_PASSWORD is read
 // from the environment instead.
+// Never put the password on the command line (`ADMIN_PASSWORD=... pnpm admin:create`): it ends up
+// in the shell history and in the process list. Without a TTY, type it silently first:
+//   read -s ADMIN_PASSWORD; export ADMIN_PASSWORD; pnpm admin:create <email>; unset ADMIN_PASSWORD
 import 'dotenv/config';
 import {
   ADMIN_PASSWORD_MAX_LENGTH,

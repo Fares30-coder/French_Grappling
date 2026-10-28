@@ -38,10 +38,24 @@ export async function buildApp({ prisma, config, logStream }: AppDeps): Promise<
   registerErrorHandlers(app);
   // The API only serves JSON: lock everything down. The front's CSP is set by its host (phase 3).
   await app.register(fastifyHelmet, {
-    contentSecurityPolicy: { directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } },
+    // useDefaults: false, so the policy is exactly these two directives (no helmet defaults).
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] },
+    },
+    // HSTS keeps helmet's defaults (180 days, includeSubDomains). Review includeSubDomains and
+    // preload at deployment (phase 3), once we know which subdomains share the registered domain.
     crossOriginResourcePolicy: { policy: 'same-site' },
   });
   registerOriginCheck(app, config.webOrigins);
+  // Credentials and session state: never cached, whatever the status (400/403/413/415/429 included).
+  app.addHook('onSend', async (request, reply, payload) => {
+    const path = request.url.split('?')[0] ?? '';
+    if (path === '/api/auth' || path.startsWith('/api/auth/')) {
+      reply.header('Cache-Control', 'no-store');
+    }
+    return payload;
+  });
 
   await app.register(fastifyCookie);
   // expiresIn is a string on purpose: a number would be read as milliseconds by fast-jwt.
