@@ -1,0 +1,136 @@
+# Tatamap — contexte projet
+
+Site web de techniques de jiu-jitsu brésilien / grappling **en français**, avec des **animations 3D orientables** de chaque technique (soumissions, passages de garde, renversements, sorties). Projet perso de Fares Haouari (dev full stack, Lille), avec un objectif de petits revenus à terme.
+
+Documents de référence :
+- Architecture et modèle de données (doc Claude) : https://claude.ai/artifact/NV7cTNjGW8yQqgCp1X3X4b
+- Maquette Canva (bibliothèque, page technique, carte des positions) : https://canva.link/8itggvooxvh1kgl
+
+## Décisions prises
+
+- **Nom : Tatamap** (tatami + map). Concurrent au nom proche à surveiller : Tatamy (tatamy.app, journal d'entraînement arts martiaux). À faire : réserver tatamap.fr / .com, @tatamap sur Instagram et TikTok, dépôt INPI plus tard.
+- **Site web d'abord (PWA)**, pas d'app mobile native au départ : la 3D web (Three.js) est mature, ça colle au stack React/Node, pas de stores, l'éditeur de poses est plus confortable sur ordinateur.
+- **Différenciation** face au marché (Grapplearts, BJJ Fanatics, GrappleKit, BJJ OS, Your BJJ, Tatami…, presque tous en anglais) : le français, la 3D orientable, la carte des positions (graphe).
+- **Animations** : pas de vidéo générée par IA (rendu faux sur le grappling). Chaque technique = une suite de poses (articulations des 2 combattants), interpolées. Le contenu est créé via un **éditeur de poses admin**.
+- **Monétisation** (seulement après validation en club) : 1) abonnement clubs/profs (B2B, piste principale), 2) freemium pratiquants, 3) affiliation contextuelle (instructionals, kimonos), 4) sponsoring d'une catégorie. **Pas de pubs classiques / pop-ups** (peu rentable sur une niche, nuit à la 3D, au RGPD et au SEO). Éventuellement une seule bannière latérale desktop, à tester plus tard.
+- Encaissement via la micro-entreprise de Fares (Stripe).
+
+## Stack
+
+| Brique | Choix |
+| --- | --- |
+| Front | React + Vite + TypeScript, Tailwind CSS |
+| 3D | React Three Fiber + drei (OrbitControls) |
+| Données front | React Router + TanStack Query |
+| PWA | vite-plugin-pwa (hors ligne au club) |
+| Back | Node + Fastify (Express envisagé, Fastify par défaut) + TypeScript |
+| ORM / base | Prisma + PostgreSQL (poses en JSONB) |
+| Validation | Zod, schémas partagés front/back |
+| Auth | JWT, un seul compte admin au début |
+| Hébergement | Front Vercel ou Netlify, API + base Render ou Railway |
+| CI | GitHub Actions |
+
+Structure prévue (monorepo) : `apps/web`, `apps/api`, `packages/shared`, `docker-compose.yml` (PostgreSQL local).
+
+## Modèle de données
+
+Une technique est une **arête entre deux positions** (départ → arrivée, arrivée vide pour une soumission) : ça donne la carte des positions sans table supplémentaire.
+
+- **Position** : id, slug, nom, description, rôle (dessus / dessous / neutre)
+- **Technique** : id, slug, nom, catégorie, niveau, gi/no-gi, statut (brouillon/publié), points clés, erreurs fréquentes ; positionDépart, positionArrivée (nullable) ; étapes ; tags
+- **Étape** : id, ordre, titre, texte, durée de transition (ms) ; une pose
+- **Pose** : id, données JSONB, version du squelette
+- **Enchaînement** : technique source, technique cible, type (suite, contre, alternative)
+- **Tag** (many-to-many avec Technique), **Admin** (email, hash mot de passe)
+- Enums : catégorie = soumission, passage, renversement, sortie, projection ; niveau = débutant, intermédiaire, avancé
+
+### Format d'une pose (squelette `v1-11`)
+
+11 articulations par combattant, en (x, y, z), en cm, tatami à y = 0. Ordre : head, neck, hip, elbowL, handL, elbowR, handR, kneeL, footL, kneeR, footR. Combattants : `me` (dessous au départ, couleur #1D9E75) et `opponent` (#D85A30). `camera` optionnelle (angle conseillé par étape).
+
+```json
+{
+  "skeleton": "v1-11",
+  "fighters": {
+    "me": { "head": [x,y,z], "neck": [...], "hip": [...], "elbowL": [...], "handL": [...], "elbowR": [...], "handR": [...], "kneeL": [...], "footL": [...], "kneeR": [...], "footR": [...] },
+    "opponent": { "...": "mêmes 11 articulations" }
+  },
+  "camera": { "position": [170, 170, 300], "target": [0, 40, 20] }
+}
+```
+
+Rendu du prototype : sphères aux articulations, cylindres entre (cou-hanche, cou-coude-main ×2, hanche-genou-pied ×2), tête r=13, interpolation smoothstep entre étapes (maintien ~1,2 s, transition ~1,3 s).
+
+### Données du prototype : ciseau depuis la garde fermée
+
+Prototype 3D validé (poses placées à l'œil, à affiner dans l'éditeur). Coordonnées 2D issues d'un SVG (y vers le bas, sol à y=306) converties en 3D par `x3 = x - 300`, `y3 = 306 - y`, `z = 0` pour tête/cou/hanche, `+16` pour les membres *L, `-16` pour les membres *R. Étape 4 : `me` décalé de +18 en z ; `opponent` = pose 3 tournée de 55° autour de l'axe X (chute latérale), y min 6.
+
+Étapes :
+1. Garde fermée : contrôle du col et de la manche
+2. Ouvre la garde, décale les hanches, tibia en travers du ventre
+3. Tire l'adversaire vers toi pour le casser vers l'avant
+4. Ciseau : la jambe du haut pousse, celle du bas fauche
+5. Il bascule sur le côté : tu finis en montée (mount)
+
+Poses 2D (ordre des articulations ci-dessus), étapes 1 à 4 :
+
+```js
+const ME_2D = [
+  [[150,282],[175,285],[270,288],[215,250],[290,215],[220,258],[285,230],[320,250],[352,262],[315,256],[345,272]],
+  [[155,280],[180,284],[275,286],[230,235],[312,182],[235,250],[300,220],[300,212],[348,226],[290,288],[322,296]],
+  [[165,275],[190,280],[275,286],[235,225],[290,190],[235,245],[285,222],[295,210],[340,222],[295,288],[325,296]],
+  [[230,240],[250,255],[300,285],[290,225],[340,205],[290,240],[335,225],[330,200],[385,185],[345,285],[390,292]]
+];
+const OPP_2D = [
+  [[322,150],[325,175],[332,240],[302,210],[278,258],[308,215],[285,262],[290,295],[372,298],[295,292],[376,296]],
+  [[318,152],[322,178],[332,240],[300,212],[282,262],[305,218],[288,266],[292,295],[372,298],[298,292],[376,296]],
+  [[272,172],[292,190],[335,242],[275,232],[262,270],[280,238],[268,274],[295,295],[372,298],[300,292],[376,296]]
+];
+```
+
+Étape 5 (directement en 3D) :
+
+```js
+const ME_5 =  [[30,130,62],[30,105,55],[30,40,35],[55,75,75],[45,30,95],[5,75,75],[15,30,95],[65,8,35],[65,6,-5],[-5,8,35],[-5,6,-5]];
+const OPP_5 = [[30,12,140],[30,14,115],[30,14,20],[55,20,75],[40,40,45],[5,20,75],[20,40,45],[50,45,-20],[50,6,-55],[10,45,-20],[10,6,-55]];
+```
+
+## API REST (MVP)
+
+Public (techniques publiées uniquement) :
+- `GET /api/techniques?categorie=&position=&niveau=&gi=&q=`
+- `GET /api/techniques/:slug` (étapes, poses, enchaînements)
+- `GET /api/positions`, `GET /api/graph` (nœuds = positions, arêtes = techniques), `GET /api/tags`
+- `POST /api/auth/login` (JWT admin)
+
+Admin (JWT) :
+- `POST /api/techniques`, `PUT /api/techniques/:id` (infos + étapes + poses), `POST /api/techniques/:id/publish`, `DELETE /api/techniques/:id`, `POST|PUT /api/positions`
+
+## Écrans
+
+- `/` Bibliothèque : recherche, filtres (catégorie, position, gi/no-gi, niveau), grille de cartes avec vignette 3D
+- `/techniques/:slug` Page technique : viewer 3D (lecture/pause, étapes, vitesse, caméra libre), étapes synchronisées, points clés, erreurs fréquentes, enchaînements
+- `/carte` Carte des positions (graphe cliquable)
+- `/admin/login`, `/admin/techniques/:id` Éditeur de poses (articulations déplaçables, aperçu, publier)
+
+Le viewer 3D est **un seul composant réutilisé** (page technique, vignettes au survol, éditeur).
+
+## Roadmap (critères de passage plutôt que dates)
+
+1. **Socle** : repo, CI, Prisma, API en lecture, viewer 3D sur un JSON → critère : *le ciseau s'anime en lisant l'API*
+2. **Contenu** : éditeur de poses, connexion admin, 15 à 20 techniques → critère : *15 techniques publiées*
+3. **Test en club** : PWA hors ligne, carte des positions, 2 ou 3 clubs testeurs → critère : *un prof prêt à payer*
+4. **Revenus** : espace club, abonnements Stripe, dépôt de marque INPI
+
+## Prochaines étapes immédiates (phase 1)
+
+1. Monorepo `apps/web`, `apps/api`, `packages/shared`
+2. `docker-compose.yml` avec PostgreSQL
+3. Schéma Prisma + seed du ciseau (données ci-dessus)
+4. `GET /api/techniques/:slug`
+5. Composant viewer React Three Fiber qui lit la technique depuis l'API
+
+## Conventions
+
+- Code et commentaires en anglais, contenu du site en français.
+- TypeScript strict partout.
