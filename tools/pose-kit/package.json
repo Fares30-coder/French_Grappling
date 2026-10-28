@@ -1,0 +1,25 @@
+{
+  "name": "@tatamap/pose-kit",
+  "private": true,
+  "type": "module",
+  "description": "Authoring tools for v1-11 poses: IK helpers, pose checker, screenshots of the real viewer.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "check": "tsx src/cli/check.ts",
+    "render": "tsx src/cli/render.ts"
+  },
+  "dependencies": {
+    "@tatamap/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "playwright": "1.64.1",
+    "tsx": "~4.23.15",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
