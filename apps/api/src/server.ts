@@ -1,11 +1,11 @@
 import 'dotenv/config';
 import { buildApp } from './app';
 import { createPrisma } from './db';
-import { loadEnv } from './env';
+import { loadEnv, toAppConfig } from './env';
 
 const env = loadEnv();
 const prisma = createPrisma(env.DATABASE_URL);
-const app = buildApp({ prisma, logLevel: env.LOG_LEVEL });
+const app = await buildApp({ prisma, config: toAppConfig(env) });
 
 async function shutdown(signal: string): Promise<void> {
   app.log.info({ signal }, 'shutting down');

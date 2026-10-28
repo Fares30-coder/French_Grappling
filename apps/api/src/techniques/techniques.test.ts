@@ -1,13 +1,13 @@
 import { apiErrorSchema, currentPoseSchema, techniqueDetailSchema } from '@tatamap/shared';
 import { afterAll, describe, expect, it } from 'vitest';
 import { buildScissorPoses } from '../../prisma/seed-data/scissor-sweep';
-import { buildApp } from '../app';
 import { createPrisma } from '../db';
+import { buildTestApp } from '../test-utils';
 import { toStepCreateData } from './step-data';
 
 // Integration tests: need a migrated and seeded database (pnpm db:seed).
 const prisma = createPrisma(process.env.DATABASE_URL ?? '');
-const app = buildApp({ prisma });
+const app = await buildTestApp(prisma);
 
 afterAll(async () => {
   await app.close();
