@@ -16,7 +16,8 @@
     "db:down": "docker compose down",
     "db:generate": "pnpm --filter @tatamap/api exec prisma generate",
     "db:migrate": "pnpm --filter @tatamap/api exec prisma migrate dev",
-    "db:reset": "pnpm --filter @tatamap/api exec prisma migrate reset --force"
+    "db:reset": "pnpm --filter @tatamap/api exec prisma migrate reset --force",
+    "db:seed": "pnpm --filter @tatamap/api exec prisma db seed"
   },
   "devDependencies": {
     "@biomejs/biome": "~2.6.3"

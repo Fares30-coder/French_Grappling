@@ -12,6 +12,19 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: tatamap
+          POSTGRES_PASSWORD: tatamap
+          POSTGRES_DB: tatamap
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tatamap"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://tatamap:tatamap@localhost:5432/tatamap
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6 # reads "packageManager" from package.json
@@ -20,7 +33,10 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm db:generate
       - run: pnpm lint
       - run: pnpm typecheck
+      - run: pnpm --filter @tatamap/api exec prisma migrate deploy
+      - run: pnpm db:seed
       - run: pnpm test
       - run: pnpm build
