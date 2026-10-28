@@ -5,6 +5,7 @@ export * from './admin/publish';
 export * from './admin/tag';
 export * from './admin/technique';
 export * from './common';
+export * from './content';
 export * from './defaults';
 export * from './enums';
 export * from './pose/edit';

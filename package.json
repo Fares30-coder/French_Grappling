@@ -13,6 +13,8 @@
     "format": "biome check --write .",
     "test": "pnpm -r test",
     "admin:create": "pnpm --filter @tatamap/api exec tsx scripts/create-admin.ts",
+    "content:export": "pnpm --filter @tatamap/api exec tsx scripts/content-export.ts",
+    "content:import": "pnpm --filter @tatamap/api exec tsx scripts/content-import.ts",
     "db:up": "docker compose up -d --wait db",
     "db:down": "docker compose down",
     "db:generate": "pnpm --filter @tatamap/api exec prisma generate",
