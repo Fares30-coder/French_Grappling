@@ -211,6 +211,8 @@ await app.register(fastifyJwt, {
 
 Le payload vérifié est re-parsé avec Zod (`{ sub: z.uuid(), iat: z.int(), exp: z.int() }`, objet non strict car fast-jwt ajoute `iss`/`aud`) avant usage.
 
+**Cookie « appareil de confiance » (ajouté après la revue cybersécurité n° 2).** Le plafond de 20 échecs par compte (`login-limiter.ts`) permettait à quiconque connaît l'email de l'admin de le bloquer volontairement pendant une heure. Après une connexion réussie, l'API pose `__Host-tatamap_device` (`tatamap_device` si `COOKIE_SECURE=false`) : un JWT HS256 (même secret, `iss`/`aud`) de `typ: 'device'`, lié à `sub` et à l'email normalisé, valable 1 an, `HttpOnly; Secure; SameSite=Strict; Path=/`. Au login, si ce cookie est valide et correspond à l'email saisi (et à l'admin trouvé), le blocage par compte est ignoré et ses échecs ne sont pas comptés ; la limite par IP s'applique toujours. Ce cookie **n'authentifie jamais** une requête (seul le cookie de session le fait) : les deux jetons ne sont pas interchangeables (`typ` pour l'un, `sv`/`authTime` exigés pour l'autre), et le logout ne le supprime pas. Il est couvert par la redaction des logs (`cookie` et `set-cookie`).
+
 ### B5. CSRF : SameSite=Strict + contrôle d'`Origin`, sans jeton
 
 **Décision.** Pas de `@fastify/csrf-protection`. Trois protections cumulées :

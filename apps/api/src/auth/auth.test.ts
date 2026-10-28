@@ -226,6 +226,142 @@ describe('per-account login limit', () => {
   });
 });
 
+describe('trusted device cookie', () => {
+  const DEVICE = '__Host-tatamap_device';
+  const attempt = (
+    app: FastifyInstance,
+    i: number,
+    email: string,
+    password: string,
+    cookie?: string,
+  ) =>
+    loginRequest(
+      app,
+      { email, password },
+      { 'x-forwarded-for': `10.2.${i >> 8}.${i & 255}`, ...(cookie ? { cookie } : {}) },
+    );
+  const block = async (app: FastifyInstance) => {
+    for (let i = 0; i < 20; i++) await attempt(app, i, admin.email, 'wrong-password-1');
+  };
+  /** Logs in once and returns the device cookie as a `Cookie` header value. */
+  const deviceCookie = async (app: FastifyInstance) => {
+    const res = await attempt(app, 900, admin.email, admin.password);
+    const value = cookieValue(res.headers['set-cookie'], DEVICE);
+    expect(value).toBeTruthy();
+    return `${DEVICE}=${value}`;
+  };
+
+  it('is set at login: HttpOnly, Secure, SameSite=Strict, Path=/, one year', async () => {
+    const app = await newApp();
+    const res = await loginRequest(app, { email: admin.email, password: admin.password });
+    const line = (res.headers['set-cookie'] as string[]).find((c) => c.startsWith(`${DEVICE}=`));
+    expect(line).toBeDefined();
+    for (const attr of ['HttpOnly', 'Secure', 'SameSite=Strict', 'Path=/', 'Max-Age=31536000']) {
+      expect(line).toContain(attr);
+    }
+    expect(line).not.toMatch(/Domain=/i);
+  });
+
+  it('uses a plain name without Secure when cookieSecure is false', async () => {
+    const app = await newApp({ cookieSecure: false, cookieName: 'tatamap_session' });
+    const res = await loginRequest(app, { email: admin.email, password: admin.password });
+    const line = (res.headers['set-cookie'] as string[]).find((c) =>
+      c.startsWith('tatamap_device='),
+    );
+    expect(line).toBeDefined();
+    expect(line).not.toContain('Secure');
+  });
+
+  it('lets the owner in on a blocked account, while an unknown device gets 429', async () => {
+    const app = await newApp({ trustProxy: 1 });
+    const cookie = await deviceCookie(app);
+    await block(app);
+    expect((await attempt(app, 100, admin.email, admin.password)).statusCode).toBe(429);
+    expect((await attempt(app, 101, admin.email, admin.password, cookie)).statusCode).toBe(200);
+  });
+
+  it('ignores a device cookie issued for another email', async () => {
+    const app = await newApp({ trustProxy: 1 });
+    const other = await createTestAdmin(prisma);
+    try {
+      const res = await attempt(app, 900, other.email, other.password);
+      const otherCookie = `${DEVICE}=${cookieValue(res.headers['set-cookie'], DEVICE)}`;
+      await block(app);
+      expect((await attempt(app, 100, admin.email, admin.password, otherCookie)).statusCode).toBe(
+        429,
+      );
+    } finally {
+      await prisma.admin.deleteMany({ where: { id: other.id } });
+    }
+  });
+
+  it('ignores a session token presented as a device cookie, and the reverse', async () => {
+    const app = await newApp({ trustProxy: 1 });
+    const session = sessionCookie(app, admin.id).split('=')[1] ?? '';
+    await block(app);
+    expect(
+      (await attempt(app, 100, admin.email, admin.password, `${DEVICE}=${session}`)).statusCode,
+    ).toBe(429);
+
+    // A device token is no session either.
+    const device = (await deviceCookie(await newApp())).split('=')[1] ?? '';
+    expect((await me(app, `${COOKIE}=${device}`)).statusCode).toBe(401);
+  });
+
+  it('does not count the failures of a trusted device', async () => {
+    const app = await newApp({ trustProxy: 1 });
+    const cookie = await deviceCookie(app);
+    for (let i = 0; i < 25; i++) {
+      expect((await attempt(app, i, admin.email, 'wrong-password-1', cookie)).statusCode).toBe(401);
+    }
+    // Nothing was counted: an unknown device is not blocked either.
+    expect((await attempt(app, 200, admin.email, admin.password)).statusCode).toBe(200);
+  });
+
+  it('ignores a garbage or tampered device cookie', async () => {
+    const app = await newApp({ trustProxy: 1 });
+    const good = (await deviceCookie(app)).split('=')[1] ?? '';
+    await block(app);
+    for (const value of ['garbage', `${good}x`, good.split('.').slice(0, 2).join('.')]) {
+      expect(
+        (await attempt(app, 100, admin.email, admin.password, `${DEVICE}=${value}`)).statusCode,
+      ).toBe(429);
+    }
+  });
+
+  it('never authenticates an admin request on its own', async () => {
+    const app = await newApp();
+    const cookie = await deviceCookie(app);
+    expect((await me(app, cookie)).statusCode).toBe(401);
+  });
+
+  it('survives logout (only the session cookie is cleared)', async () => {
+    const app = await newApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/logout',
+      headers: { origin: ORIGIN },
+    });
+    expect(String(res.headers['set-cookie'])).not.toContain('tatamap_device');
+  });
+
+  it('never appears in the logs', async () => {
+    const lines: string[] = [];
+    const sink = new Writable({
+      write(chunk, _enc, done) {
+        lines.push(String(chunk));
+        done();
+      },
+    });
+    const app = await newApp({ logLevel: 'trace' }, sink);
+    const cookie = await deviceCookie(app);
+    await attempt(app, 1, admin.email, admin.password, cookie);
+    const logs = lines.join('');
+    expect(logs.length).toBeGreaterThan(0);
+    expect(logs).not.toContain(cookie.split('=')[1] ?? 'x');
+  });
+});
+
 describe('createLoginLimiter', () => {
   it('blocks at the threshold and expires failures after the window', () => {
     let t = 0;

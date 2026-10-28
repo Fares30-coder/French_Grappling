@@ -5,8 +5,9 @@
  * Deliberately simple: an in-memory map in the API process, so it is reset on every restart and
  * not shared between instances. That is acceptable here (one process, one admin account); move it
  * to a shared store if the API ever scales out. Unknown emails are counted too, so the answer does
- * not reveal whether an account exists. Side effect: someone who knows the admin email can lock
- * the account out for up to an hour by failing on purpose; the owner can restart the API.
+ * not reveal whether an account exists. Side effect: someone who knows the admin email could lock
+ * the account out for up to an hour by failing on purpose; a device that already logged in
+ * ("trusted device" cookie, see auth/device.ts) bypasses the cap and is not counted.
  */
 export const LOGIN_FAILURES_PER_ACCOUNT = 20;
 export const LOGIN_FAILURE_WINDOW_MS = 60 * 60 * 1000;
