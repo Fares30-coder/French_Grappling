@@ -1,0 +1,22 @@
+{
+  "name": "@tatamap/api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@tatamap/shared": "workspace:*",
+    "fastify": "~5.12.7"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsdown": "~0.23.2",
+    "tsx": "~4.23.15",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
