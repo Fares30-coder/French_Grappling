@@ -183,6 +183,38 @@ describe('DELETE', () => {
     expect((await call('DELETE', `/api/admin/techniques/${draft.id}`)).statusCode).toBe(404);
   });
 
+  it('refuses a body on the routes that take none (JSON, empty object, text/plain)', async () => {
+    const { id, slug } = await make({ stepCount: 2 });
+    for (const [method, url] of [
+      ['DELETE', `/api/admin/techniques/${id}`],
+      ['POST', `/api/admin/techniques/${id}/duplicate`],
+    ] as const) {
+      const bodies = [
+        { payload: { version: 1 } },
+        { payload: {} },
+        { payload: 'hello', headers: { 'content-type': 'text/plain' } },
+      ];
+      for (const { payload, headers } of bodies) {
+        const res = await app.inject({
+          method,
+          url,
+          headers: { origin: ORIGIN, cookie, ...headers },
+          payload: payload as object | string,
+        });
+        expect(res.statusCode, `${method} ${url}`).toBe(400);
+        expect(apiErrorSchema.parse(res.json()).error.code).toBe('bad_request');
+      }
+    }
+    // Nothing was done: still there, no copy made.
+    expect(await prisma.technique.count({ where: { id } })).toBe(1);
+    expect(await prisma.technique.count({ where: { slug: `${slug}-copie` } })).toBe(0);
+    // Without a body they still work.
+    const copy = await call('POST', `/api/admin/techniques/${id}/duplicate`);
+    expect(copy.statusCode).toBe(201);
+    created.push(adminTechniqueSchema.parse(copy.json()).id);
+    expect((await call('DELETE', `/api/admin/techniques/${id}`)).statusCode).toBe(204);
+  });
+
   it('requires Origin and a session on every write route', async () => {
     const { id } = await make();
     for (const [method, url] of [

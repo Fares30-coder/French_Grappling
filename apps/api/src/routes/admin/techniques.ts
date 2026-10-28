@@ -5,7 +5,7 @@ import {
   versionInputSchema,
 } from '@tatamap/shared';
 import type { FastifyInstance } from 'fastify';
-import { sendApiError } from '../../errors';
+import { requireNoBody, sendApiError } from '../../errors';
 import type { PrismaClient } from '../../generated/prisma/client';
 import {
   findAdminTechnique,
@@ -66,7 +66,7 @@ export function registerAdminTechniqueRoutes(app: FastifyInstance, prisma: Prism
     });
   }
 
-  app.post('/techniques/:id/duplicate', async (request, reply) => {
+  app.post('/techniques/:id/duplicate', { preHandler: requireNoBody }, async (request, reply) => {
     const params = idParamsSchema.safeParse(request.params);
     if (!params.success) return sendApiError(reply, 400, 'bad_request', 'Invalid request');
     const row = await duplicateTechnique(prisma, params.data.id);
@@ -74,7 +74,7 @@ export function registerAdminTechniqueRoutes(app: FastifyInstance, prisma: Prism
     return reply.status(201).send(toAdminTechnique(row));
   });
 
-  app.delete('/techniques/:id', async (request, reply) => {
+  app.delete('/techniques/:id', { preHandler: requireNoBody }, async (request, reply) => {
     const params = idParamsSchema.safeParse(request.params);
     if (!params.success) return sendApiError(reply, 400, 'bad_request', 'Invalid request');
     await deleteTechnique(prisma, params.data.id);

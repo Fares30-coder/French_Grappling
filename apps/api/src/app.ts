@@ -43,8 +43,9 @@ export async function buildApp({ prisma, config, logStream }: AppDeps): Promise<
       useDefaults: false,
       directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] },
     },
-    // HSTS keeps helmet's defaults (180 days, includeSubDomains). Review includeSubDomains and
-    // preload at deployment (phase 3), once we know which subdomains share the registered domain.
+    // HSTS keeps helmet's defaults: max-age of one year (31536000 s) with includeSubDomains.
+    // TODO(phase 3): review includeSubDomains (and preload) at deployment, once we know which
+    // subdomains share the registered domain.
     crossOriginResourcePolicy: { policy: 'same-site' },
   });
   registerOriginCheck(app, config.webOrigins);

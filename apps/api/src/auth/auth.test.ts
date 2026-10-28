@@ -373,6 +373,19 @@ describe('createLoginLimiter', () => {
   });
 });
 
+describe('POST /api/auth/logout body', () => {
+  it('refuses a body', async () => {
+    const app = await newApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/logout',
+      headers: { origin: ORIGIN },
+      payload: {},
+    });
+    expect(res.statusCode).toBe(400);
+  });
+});
+
 describe('POST /api/auth/logout', () => {
   it('answers 204 and clears the cookie', async () => {
     const app = await newApp();

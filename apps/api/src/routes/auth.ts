@@ -5,7 +5,7 @@ import { createLoginLimiter } from '../auth/login-limiter';
 import { verifyPassword } from '../auth/password';
 import { authenticate, clearSession, issueSession } from '../auth/session';
 import type { AppConfig } from '../config';
-import { sendApiError } from '../errors';
+import { requireNoBody, sendApiError } from '../errors';
 import type { PrismaClient } from '../generated/prisma/client';
 
 const LOGIN_MAX_ATTEMPTS = 5;
@@ -54,7 +54,7 @@ export function registerAuthRoutes(
     },
   );
 
-  app.post('/api/auth/logout', async (request, reply) => {
+  app.post('/api/auth/logout', { preHandler: requireNoBody }, async (request, reply) => {
     reply.header('Cache-Control', 'no-store');
     // A valid session is revoked server-side (every token of the admin dies), not only forgotten.
     const session = await authenticate(request, prisma);

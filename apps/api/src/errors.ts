@@ -30,6 +30,21 @@ export class ApiFailure extends Error {
   }
 }
 
+/**
+ * preHandler for write routes that take no body (duplicate, delete, logout): a body, even `{}` or
+ * text/plain, is refused instead of silently ignored. The web client sends none (apiSend).
+ */
+export async function requireNoBody(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<FastifyReply | undefined> {
+  // Returning the reply is what stops an async hook chain once the response has been sent.
+  if (request.body !== undefined) {
+    return sendApiError(reply, 400, 'bad_request', 'This route takes no body');
+  }
+  return undefined;
+}
+
 const CLIENT_ERROR_CODES: Partial<Record<number, ApiErrorCode>> = {
   400: 'bad_request',
   401: 'unauthorized',
