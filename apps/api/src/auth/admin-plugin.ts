@@ -3,7 +3,7 @@ import type { AppConfig } from '../config';
 import { sendApiError } from '../errors';
 import type { PrismaClient } from '../generated/prisma/client';
 import { registerMeRoute } from '../routes/admin/me';
-import { issueSession, sessionPayloadSchema, shouldRenew } from './session';
+import { authenticate, issueSession, shouldRenew } from './session';
 
 type Options = { prisma: PrismaClient; config: AppConfig };
 
@@ -15,24 +15,13 @@ export const adminPlugin: FastifyPluginAsync<Options> = async (app, { prisma, co
   app.decorateRequest('admin', null);
 
   app.addHook('onRequest', async (request, reply) => {
-    const unauthorized = () => sendApiError(reply, 401, 'unauthorized', 'Authentication required');
+    const session = await authenticate(request, prisma);
+    if (!session) return sendApiError(reply, 401, 'unauthorized', 'Authentication required');
+    request.admin = { id: session.admin.id, email: session.admin.email };
 
-    // Cookie only: an Authorization header must never authenticate an admin request.
-    try {
-      await request.jwtVerify({ onlyCookie: true });
-    } catch {
-      return unauthorized();
-    }
-    const payload = sessionPayloadSchema.safeParse(request.user);
-    if (!payload.success) return unauthorized();
-
-    // Deleting the admin revokes the session immediately.
-    const admin = await prisma.admin.findUnique({ where: { id: payload.data.sub } });
-    if (!admin) return unauthorized();
-    request.admin = { id: admin.id, email: admin.email };
-
-    if (shouldRenew(payload.data.exp, Math.floor(Date.now() / 1000))) {
-      issueSession(app, reply, config, admin.id);
+    if (shouldRenew(session.payload.exp, Math.floor(Date.now() / 1000))) {
+      // authTime is kept: renewal never extends the absolute lifetime.
+      issueSession(app, reply, config, session.admin, session.payload.authTime);
     }
   });
 

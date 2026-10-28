@@ -79,7 +79,13 @@ export function sessionCookie(
   app: FastifyInstance,
   adminId: string,
   expiresIn = '2h',
+  claims: { sv?: number; authTime?: number } = {},
   cookieName = testConfig().cookieName,
 ): string {
-  return `${cookieName}=${app.jwt.sign({ sub: adminId }, { expiresIn })}`;
+  const payload = {
+    sub: adminId,
+    sv: claims.sv ?? 0,
+    authTime: claims.authTime ?? Math.floor(Date.now() / 1000),
+  };
+  return `${cookieName}=${app.jwt.sign(payload, { expiresIn })}`;
 }

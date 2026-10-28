@@ -132,5 +132,7 @@ model Admin {
   id           String   @id @default(uuid(7)) @db.Uuid
   email        String   @unique
   passwordHash String
+  /// Bumped on logout and password change: tokens carrying an older value are refused.
+  sessionVersion Int    @default(0)
   createdAt    DateTime @default(now())
 }

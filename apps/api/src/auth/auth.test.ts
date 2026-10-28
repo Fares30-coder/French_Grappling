@@ -8,6 +8,7 @@ import {
   buildTestApp,
   cookieValue,
   createTestAdmin,
+  login,
   ORIGIN,
   sessionCookie,
   testConfig,
@@ -55,11 +56,15 @@ function craft(options: {
   expiresInS?: number;
   iss?: string;
   aud?: string;
+  sv?: number;
+  authTime?: number;
 }): string {
   const now = Math.floor(Date.now() / 1000);
   const header = b64({ alg: options.alg ?? 'HS256', typ: 'JWT' });
   const body = b64({
     sub: options.sub ?? admin.id,
+    sv: options.sv ?? 0,
+    authTime: options.authTime ?? now,
     iat: now,
     exp: now + (options.expiresInS ?? 7200),
     iss: options.iss ?? 'tatamap-api',
@@ -71,6 +76,19 @@ function craft(options: {
   return `${data}.${createHmac(hmac, options.secret ?? testConfig().jwtSecret)
     .update(data)
     .digest('base64url')}`;
+}
+
+/** Token shaped like the ones issued before sessions were revocable (no sv, no authTime). */
+function craftLegacy(): string {
+  const now = Math.floor(Date.now() / 1000);
+  const data = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({
+    sub: admin.id,
+    iat: now,
+    exp: now + 7200,
+    iss: 'tatamap-api',
+    aud: 'tatamap-admin',
+  })}`;
+  return `${data}.${createHmac('sha256', testConfig().jwtSecret).update(data).digest('base64url')}`;
 }
 
 describe('POST /api/auth/login', () => {
@@ -181,6 +199,41 @@ describe('POST /api/auth/logout', () => {
     expect(setCookie).toContain('Max-Age=0');
   });
 
+  it('revokes the session: the same token is refused afterwards', async () => {
+    const own = await createTestAdmin(prisma);
+    const app = await newApp();
+    const cookie = await login(app, { email: own.email, password: own.password });
+    expect((await me(app, cookie)).statusCode).toBe(200);
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/logout',
+      headers: { origin: ORIGIN, cookie },
+    });
+    expect(res.statusCode).toBe(204);
+    expect((await me(app, cookie)).statusCode).toBe(401);
+    const row = await prisma.admin.findUniqueOrThrow({ where: { id: own.id } });
+    expect(row.sessionVersion).toBe(1);
+    await prisma.admin.delete({ where: { id: own.id } });
+  });
+
+  it('does not bump sessionVersion for a request without a valid session', async () => {
+    const own = await createTestAdmin(prisma);
+    const app = await newApp();
+    await app.inject({
+      method: 'POST',
+      url: '/api/auth/logout',
+      headers: { origin: ORIGIN, cookie: `${COOKIE}=${craft({ sub: own.id, alg: 'none' })}` },
+    });
+    await app.inject({
+      method: 'POST',
+      url: '/api/auth/logout',
+      headers: { origin: ORIGIN, cookie: `${COOKIE}=${craft({ sub: own.id, sv: 7 })}` },
+    });
+    const row = await prisma.admin.findUniqueOrThrow({ where: { id: own.id } });
+    expect(row.sessionVersion).toBe(0);
+    await prisma.admin.delete({ where: { id: own.id } });
+  });
+
   it('refuses a logout without Origin', async () => {
     const app = await newApp();
     const res = await app.inject({ method: 'POST', url: '/api/auth/logout' });
@@ -235,6 +288,7 @@ describe('/api/admin guard', () => {
     ['signed with another secret', () => craft({ secret: 'another-secret-another-secret-123456' })],
     ['wrong issuer', () => craft({ iss: 'someone-else' })],
     ['wrong audience', () => craft({ aud: 'someone-else' })],
+    ['without sv and authTime', () => craftLegacy()],
     ['not a uuid subject', () => craft({ sub: 'admin' })],
     ['garbage', () => 'not.a.jwt'],
   ];
@@ -256,6 +310,40 @@ describe('/api/admin guard', () => {
     expect((await me(app, cookie)).statusCode).toBe(200);
     await prisma.admin.delete({ where: { id: gone.id } });
     expect((await me(app, cookie)).statusCode).toBe(401);
+  });
+
+  it('refuses a token issued before a password change (sessionVersion bumped)', async () => {
+    const own = await createTestAdmin(prisma);
+    const app = await newApp();
+    const cookie = sessionCookie(app, own.id);
+    expect((await me(app, cookie)).statusCode).toBe(200);
+    // Same update as `pnpm admin:create` on an existing admin.
+    await prisma.admin.update({
+      where: { id: own.id },
+      data: { passwordHash: 'x', sessionVersion: { increment: 1 } },
+    });
+    expect((await me(app, cookie)).statusCode).toBe(401);
+    expect((await me(app, sessionCookie(app, own.id, '2h', { sv: 1 }))).statusCode).toBe(200);
+    await prisma.admin.delete({ where: { id: own.id } });
+  });
+
+  it('refuses a session older than 12 hours since the login, even if the token is fresh', async () => {
+    const app = await newApp();
+    const now = Math.floor(Date.now() / 1000);
+    const fresh = (age: number) => `${COOKIE}=${craft({ authTime: now - age })}`;
+    expect((await me(app, fresh(11 * 3600 + 3000))).statusCode).toBe(200);
+    expect((await me(app, fresh(12 * 3600 + 60))).statusCode).toBe(401);
+  });
+
+  it('keeps authTime when it renews the token', async () => {
+    const app = await newApp();
+    const authTime = Math.floor(Date.now() / 1000) - 5 * 3600;
+    const res = await me(app, sessionCookie(app, admin.id, '50m', { authTime }));
+    expect(res.statusCode).toBe(200);
+    const renewed = cookieValue(res.headers['set-cookie'], COOKIE) ?? '';
+    const payload = JSON.parse(Buffer.from(renewed.split('.')[1] ?? '', 'base64url').toString());
+    expect(payload.authTime).toBe(authTime);
+    expect(payload.sv).toBe(0);
   });
 
   it('re-issues the cookie when less than an hour is left', async () => {

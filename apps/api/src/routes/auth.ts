@@ -1,7 +1,7 @@
 import { adminSessionSchema, loginInputSchema } from '@tatamap/shared';
 import type { FastifyInstance } from 'fastify';
 import { verifyPassword } from '../auth/password';
-import { clearSession, issueSession } from '../auth/session';
+import { authenticate, clearSession, issueSession } from '../auth/session';
 import type { AppConfig } from '../config';
 import { sendApiError } from '../errors';
 import type { PrismaClient } from '../generated/prisma/client';
@@ -27,13 +27,21 @@ export function registerAuthRoutes(
       const ok = await verifyPassword(admin?.passwordHash ?? null, input.data.password);
       if (!admin || !ok) return sendApiError(reply, 401, 'unauthorized', 'Invalid credentials');
 
-      issueSession(app, reply, config, admin.id);
+      issueSession(app, reply, config, admin);
       return adminSessionSchema.parse({ email: admin.email });
     },
   );
 
-  app.post('/api/auth/logout', async (_request, reply) => {
+  app.post('/api/auth/logout', async (request, reply) => {
     reply.header('Cache-Control', 'no-store');
+    // A valid session is revoked server-side (every token of the admin dies), not only forgotten.
+    const session = await authenticate(request, prisma);
+    if (session) {
+      await prisma.admin.updateMany({
+        where: { id: session.admin.id, sessionVersion: session.admin.sessionVersion },
+        data: { sessionVersion: { increment: 1 } },
+      });
+    }
     clearSession(reply, config);
     return reply.status(204).send();
   });

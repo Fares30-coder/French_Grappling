@@ -79,7 +79,8 @@ async function main(): Promise<void> {
     await prisma.admin.upsert({
       where: { email },
       create: { email, passwordHash },
-      update: { passwordHash },
+      // Changing the password also revokes every session issued before.
+      update: { passwordHash, sessionVersion: { increment: 1 } },
     });
   } finally {
     await prisma.$disconnect();
