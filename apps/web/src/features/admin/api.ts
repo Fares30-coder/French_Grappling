@@ -142,6 +142,25 @@ export function useSaveTechnique(id: string) {
       }),
     onSuccess: (technique) => {
       queryClient.setQueryData(techniqueKey(id), technique);
+      // The public page must not serve the previous content from its cache.
+      void queryClient.invalidateQueries({ queryKey: ['technique'] });
+      return queryClient.invalidateQueries({ queryKey: TECHNIQUES_KEY });
+    },
+  });
+}
+
+/** Publish or unpublish, guarded by the version the editor last saw. */
+export function useSetTechniqueStatus(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ action, version }: { action: 'publish' | 'unpublish'; version: number }) =>
+      apiRequest(`/api/admin/techniques/${id}/${action}`, adminTechniqueSchema, {
+        method: 'POST',
+        body: { version },
+      }),
+    onSuccess: (technique) => {
+      queryClient.setQueryData(techniqueKey(id), technique);
+      void queryClient.invalidateQueries({ queryKey: ['technique'] }); // public page cache
       return queryClient.invalidateQueries({ queryKey: TECHNIQUES_KEY });
     },
   });

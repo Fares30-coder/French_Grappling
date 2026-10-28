@@ -100,6 +100,8 @@ export const adminTechniqueListItemSchema = z.strictObject({
   slug: slugSchema,
   name: labelSchema,
   category: categorySchema,
+  level: levelSchema,
+  gi: giModeSchema,
   status: techniqueStatusSchema,
   stepCount: z.int().min(0),
   startPositionName: labelSchema,

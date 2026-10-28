@@ -43,6 +43,8 @@ export function toAdminTechniqueList(rows: ReadonlyArray<AdminListRow>): AdminTe
       slug: r.slug,
       name: r.name,
       category: r.category,
+      level: r.level,
+      gi: r.gi,
       status: r.status,
       stepCount: r._count.steps,
       startPositionName: r.startPosition.name,

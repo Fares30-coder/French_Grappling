@@ -1,14 +1,24 @@
 import type { AdminTechnique, CameraHint, Vec3 } from '@tatamap/shared';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { ApiRequestError } from '../../../lib/api';
 import type { ViewPreset } from '../../viewer/camera';
 import { TechniqueViewer } from '../../viewer/TechniqueViewer';
-import { isUnauthorized, useAdminPositions, useAdminTechnique, useSaveTechnique } from '../api';
+import {
+  isUnauthorized,
+  useAdminPositions,
+  useAdminTags,
+  useAdminTechnique,
+  useAdminTechniques,
+  useDeleteTechnique,
+  useSaveTechnique,
+  useSetTechniqueStatus,
+} from '../api';
 import { adminErrorMessage } from '../errors';
 import { CameraCapture } from './CameraCapture';
 import { ChainsEditor } from './ChainsEditor';
 import {
+  currentPublishIssues,
   currentWarnings,
   type EditorAction,
   editorReducer,
@@ -20,8 +30,10 @@ import { JointGizmo } from './JointGizmo';
 import { JointPanel } from './JointPanel';
 import { MetaForm } from './MetaForm';
 import { PoseTools } from './PoseTools';
+import { PreviewDialog } from './PreviewDialog';
 import { StepsPanel } from './StepsPanel';
 import { TagsPicker } from './TagsPicker';
+import { toPreview } from './to-preview';
 import { useUnsavedGuard } from './use-unsaved-guard';
 import { validateUpdateInput } from './validation';
 
@@ -83,6 +95,12 @@ function TechniqueEditor({
   }, []);
   const positions = useAdminPositions();
   const save = useSaveTechnique(loaded.id);
+  const setStatus = useSetTechniqueStatus(loaded.id);
+  const remove = useDeleteTechnique();
+  const navigate = useNavigate();
+  const tags = useAdminTags();
+  const allTechniques = useAdminTechniques();
+  const [previewing, setPreviewing] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
   const dirty = isDirty(state);
   useUnsavedGuard(dirty);
@@ -152,6 +170,18 @@ function TechniqueEditor({
   const conflict = save.error && 'reason' in save.error && save.error.reason === 'version_mismatch';
   const published = loaded.status === 'published';
   const errorCount = Object.keys(errors).length;
+  const issues = currentPublishIssues(state);
+  const preview = useMemo(
+    () =>
+      previewing
+        ? toPreview(state.technique, {
+            positions: positions.data ?? [],
+            tags: tags.data ?? [],
+            techniques: allTechniques.data ?? [],
+          })
+        : null,
+    [previewing, state.technique, positions.data, tags.data, allTechniques.data],
+  );
 
   return (
     <main className="mx-auto max-w-6xl p-4">
@@ -170,13 +200,55 @@ function TechniqueEditor({
         {dirty && <span className="text-sm text-amber-700">Modifications non enregistrées</span>}
         <button
           type="button"
+          className="ml-auto rounded border border-slate-300 px-3 py-1.5 text-sm"
+          onClick={() => setPreviewing(true)}
+        >
+          Aperçu
+        </button>
+        <button
+          type="button"
           disabled={save.isPending || !dirty}
-          className="ml-auto rounded bg-emerald-700 px-4 py-1.5 font-medium text-white disabled:opacity-50"
+          className="rounded bg-emerald-700 px-4 py-1.5 font-medium text-white disabled:opacity-50"
           onClick={onSave}
         >
           {save.isPending ? 'Enregistrement…' : 'Enregistrer'}
         </button>
       </div>
+
+      <PublishBar
+        published={published}
+        dirty={dirty}
+        issues={issues}
+        busy={setStatus.isPending || remove.isPending}
+        error={setStatus.error ?? remove.error}
+        onPublish={() =>
+          setStatus.mutate(
+            { action: 'publish', version: state.version },
+            {
+              onSuccess: (t) =>
+                dispatch({ type: 'saved', version: t.version, revision: state.revision }),
+            },
+          )
+        }
+        onUnpublish={() =>
+          setStatus.mutate(
+            { action: 'unpublish', version: state.version },
+            {
+              onSuccess: (t) =>
+                dispatch({ type: 'saved', version: t.version, revision: state.revision }),
+            },
+          )
+        }
+        onDelete={() => {
+          if (
+            window.confirm(`Supprimer « ${state.technique.name} » ? Cette action est définitive.`)
+          ) {
+            remove.mutate(loaded.id, {
+              onSuccess: () => navigate('/admin/techniques', { replace: true }),
+            });
+          }
+        }}
+      />
 
       {save.isError && (
         <div
@@ -352,6 +424,81 @@ function TechniqueEditor({
           />
         </div>
       </div>
+      {preview && <PreviewDialog result={preview} onClose={() => setPreviewing(false)} />}
     </main>
+  );
+}
+
+type PublishBarProps = {
+  published: boolean;
+  dirty: boolean;
+  issues: ReadonlyArray<string>;
+  busy: boolean;
+  error: unknown;
+  onPublish: () => void;
+  onUnpublish: () => void;
+  onDelete: () => void;
+};
+
+/** Publish / unpublish / delete, with the reasons why publishing is not possible yet. */
+function PublishBar({
+  published,
+  dirty,
+  issues,
+  busy,
+  error,
+  onPublish,
+  onUnpublish,
+  onDelete,
+}: PublishBarProps) {
+  const cannotPublish = dirty || issues.length > 0;
+  const button = 'rounded border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-50';
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      {published ? (
+        <button type="button" className={button} disabled={busy || dirty} onClick={onUnpublish}>
+          Dépublier
+        </button>
+      ) : (
+        <button
+          type="button"
+          className={`${button} border-emerald-700 text-emerald-900`}
+          disabled={busy || cannotPublish}
+          onClick={onPublish}
+        >
+          Publier
+        </button>
+      )}
+      {!published && (
+        <button
+          type="button"
+          className={`${button} text-red-700`}
+          disabled={busy}
+          onClick={onDelete}
+        >
+          Supprimer
+        </button>
+      )}
+      <div className="text-sm text-slate-700">
+        {dirty && (
+          <p>Enregistre tes modifications avant de {published ? 'dépublier' : 'publier'}.</p>
+        )}
+        {issues.length > 0 && (
+          <ul className="list-disc pl-5 text-amber-800">
+            {issues.map((issue) => (
+              <li key={issue}>
+                {published ? 'Une technique publiée doit garder ceci : ' : 'Pour publier : '}
+                {issue}
+              </li>
+            ))}
+          </ul>
+        )}
+        {error != null && (
+          <p role="alert" className="text-red-700">
+            {adminErrorMessage(error)}
+          </p>
+        )}
+      </div>
+    </div>
   );
 }

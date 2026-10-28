@@ -37,7 +37,12 @@ describe('GET /api/admin/techniques', () => {
     expect(res.statusCode).toBe(200);
     const list = adminTechniqueListSchema.parse(res.json());
     const scissor = list.find((t) => t.slug === 'ciseau-garde-fermee');
-    expect(scissor).toMatchObject({ stepCount: 5, status: 'published' });
+    expect(scissor).toMatchObject({
+      stepCount: 5,
+      status: 'published',
+      level: 'beginner',
+      gi: 'gi',
+    });
     expect(list.find((t) => t.id === draft.id)).toMatchObject({ status: 'draft', stepCount: 1 });
   });
 
