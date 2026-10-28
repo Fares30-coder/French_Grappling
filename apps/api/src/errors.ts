@@ -1,4 +1,4 @@
-import type { ApiError } from '@tatamap/shared';
+import type { ApiError, ApiErrorReason } from '@tatamap/shared';
 import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 type ApiErrorCode = ApiError['error']['code'];
@@ -9,8 +9,9 @@ export function sendApiError(
   status: number,
   code: ApiErrorCode,
   message: string,
+  reason?: ApiErrorReason,
 ): FastifyReply {
-  const payload: ApiError = { error: { code, message } };
+  const payload: ApiError = { error: { code, message, ...(reason ? { reason } : {}) } };
   return reply.status(status).send(payload);
 }
 

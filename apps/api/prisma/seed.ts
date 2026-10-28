@@ -51,7 +51,11 @@ async function main() {
     const technique = await tx.technique.upsert({
       where: { slug: SEED_TECHNIQUE.slug },
       create: { slug: SEED_TECHNIQUE.slug, ...fields, publishedAt: new Date() },
-      update: { ...fields, tags: { set: [{ slug: SEED_TAG.slug }] } },
+      update: {
+        ...fields,
+        tags: { set: [{ slug: SEED_TAG.slug }] },
+        version: { increment: 1 },
+      },
     });
 
     await tx.step.deleteMany({ where: { techniqueId: technique.id } });

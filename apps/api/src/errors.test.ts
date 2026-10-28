@@ -1,7 +1,7 @@
 import { apiErrorSchema } from '@tatamap/shared';
 import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
-import { codeForClientStatus, registerErrorHandlers } from './errors';
+import { codeForClientStatus, registerErrorHandlers, sendApiError } from './errors';
 
 function build() {
   const app = Fastify({ logger: false, bodyLimit: 16 });
@@ -37,5 +37,23 @@ describe('error handler', () => {
     expect(codeForClientStatus(401)).toBe('unauthorized');
     expect(codeForClientStatus(429)).toBe('rate_limited');
     expect(codeForClientStatus(418)).toBe('bad_request');
+  });
+});
+
+describe('sendApiError', () => {
+  const run = async (reason?: Parameters<typeof sendApiError>[4]) => {
+    const app = Fastify({ logger: false });
+    app.get('/x', async (_req, reply) => sendApiError(reply, 409, 'conflict', 'Stale', reason));
+    return (await app.inject({ method: 'GET', url: '/x' })).json();
+  };
+
+  it('includes the reason when given', async () => {
+    const body = await run('version_mismatch');
+    expect(apiErrorSchema.parse(body).error.reason).toBe('version_mismatch');
+  });
+
+  it('omits the reason otherwise', async () => {
+    const body = await run();
+    expect(body).toEqual({ error: { code: 'conflict', message: 'Stale' } });
   });
 });
