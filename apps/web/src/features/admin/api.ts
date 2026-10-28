@@ -7,6 +7,7 @@ import {
   adminTechniqueSchema,
   type LoginInput,
   type TechniqueCreateInput,
+  type TechniqueUpdateInput,
 } from '@tatamap/shared';
 import { ApiRequestError, apiRequest, apiSend } from '../../lib/api';
 
@@ -109,5 +110,33 @@ export function useDeleteTechnique() {
   return useMutation({
     mutationFn: (id: string) => apiSend(`/api/admin/techniques/${id}`, { method: 'DELETE' }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: TECHNIQUES_KEY }),
+  });
+}
+
+const techniqueKey = (id: string) => ['admin', 'technique', id] as const;
+
+export function useAdminTechnique(id: string) {
+  return useQuery({
+    queryKey: techniqueKey(id),
+    queryFn: ({ signal }) =>
+      apiRequest(`/api/admin/techniques/${id}`, adminTechniqueSchema, { signal }),
+    // A 404 or 401 will not fix itself.
+    retry: false,
+    ...adminQueryDefaults,
+  });
+}
+
+export function useSaveTechnique(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: TechniqueUpdateInput) =>
+      apiRequest(`/api/admin/techniques/${id}`, adminTechniqueSchema, {
+        method: 'PUT',
+        body: input,
+      }),
+    onSuccess: (technique) => {
+      queryClient.setQueryData(techniqueKey(id), technique);
+      return queryClient.invalidateQueries({ queryKey: TECHNIQUES_KEY });
+    },
   });
 }

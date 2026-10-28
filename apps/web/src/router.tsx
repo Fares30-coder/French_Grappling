@@ -35,6 +35,13 @@ export const router = createBrowserRouter([
                 .AdminTechniqueListPage,
             }),
           },
+          {
+            path: 'techniques/:id',
+            lazy: async () => ({
+              Component: (await import('./features/admin/editor/TechniqueEditorPage'))
+                .TechniqueEditorPage,
+            }),
+          },
         ],
       },
     ],
