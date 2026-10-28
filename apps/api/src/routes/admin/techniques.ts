@@ -1,4 +1,4 @@
-import { idParamsSchema } from '@tatamap/shared';
+import { idParamsSchema, techniqueCreateInputSchema } from '@tatamap/shared';
 import type { FastifyInstance } from 'fastify';
 import { sendApiError } from '../../errors';
 import type { PrismaClient } from '../../generated/prisma/client';
@@ -6,6 +6,7 @@ import {
   findAdminTechnique,
   listAdminTechniques,
 } from '../../techniques/admin-technique-repository';
+import { createTechnique } from '../../techniques/technique-write';
 import { toAdminTechnique, toAdminTechniqueList } from '../../techniques/to-admin-technique';
 
 export function registerAdminTechniqueRoutes(app: FastifyInstance, prisma: PrismaClient): void {
@@ -17,5 +18,13 @@ export function registerAdminTechniqueRoutes(app: FastifyInstance, prisma: Prism
     const row = await findAdminTechnique(prisma, params.data.id);
     if (!row) return sendApiError(reply, 404, 'not_found', 'Technique not found');
     return toAdminTechnique(row);
+  });
+
+  app.post('/techniques', async (request, reply) => {
+    const input = techniqueCreateInputSchema.safeParse(request.body);
+    if (!input.success) return sendApiError(reply, 400, 'bad_request', 'Invalid request');
+    const row = await createTechnique(prisma, input.data);
+    if (!row) throw new Error('created technique not found'); // cannot happen: same transaction result
+    return reply.status(201).send(toAdminTechnique(row));
   });
 }

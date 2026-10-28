@@ -15,6 +15,21 @@ export function sendApiError(
   return reply.status(status).send(payload);
 }
 
+/**
+ * A business-rule failure thrown from a service (possibly inside a transaction, which it then
+ * rolls back) and turned into an API error by the error handler.
+ */
+export class ApiFailure extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: ApiErrorCode,
+    message: string,
+    readonly reason?: ApiErrorReason,
+  ) {
+    super(message);
+  }
+}
+
 const CLIENT_ERROR_CODES: Partial<Record<number, ApiErrorCode>> = {
   400: 'bad_request',
   401: 'unauthorized',
@@ -31,6 +46,9 @@ export const codeForClientStatus = (status: number): ApiErrorCode =>
 
 export function registerErrorHandlers(app: FastifyInstance): void {
   app.setErrorHandler((error: FastifyError, request: FastifyRequest, reply: FastifyReply) => {
+    if (error instanceof ApiFailure) {
+      return sendApiError(reply, error.status, error.code, error.message, error.reason);
+    }
     // Client errors raised by Fastify itself (malformed JSON, payload too large...) keep their status.
     const status = error.statusCode;
     if (status !== undefined && status >= 400 && status < 500) {
