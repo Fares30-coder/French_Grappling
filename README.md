@@ -94,9 +94,9 @@ pnpm pose:render <slug|chemin.json> [--out dossier] [--steps 1,3] [--views 3d,fa
 pnpm --filter @tatamap/pose-kit exec playwright install chromium   # une seule fois
 ```
 
-- `pose:check` : validation du schéma (bloquante, code de sortie 1), puis, par étape, longueurs d'os hors tolérance par rapport à l'étape 1 (même règle que l'éditeur), articulations qui s'enfoncent dans le tatami, et alertes d'interpénétration. Cette dernière est une **heuristique grossière** sur le squelette nu (segments à moins de 6 cm, ou qui traversent le buste ou la tête de l'autre) : une prise au col peut la déclencher.
+- `pose:check` : validation du schéma (bloquante, code de sortie 1), puis, par étape, longueurs d'os hors tolérance (12 %) par rapport au **corps standard** `STANDARD_BODY_V1_11` de `@tatamap/shared` (même règle que l'éditeur ; l'ancienne comparaison avec l'étape 1 a disparu), articulations qui s'enfoncent dans le tatami, et alertes d'interpénétration. Cette dernière est une **heuristique grossière** sur le squelette nu (segments à moins de 6 cm, ou qui traversent le buste ou la tête de l'autre) : une prise au col peut la déclencher.
 - `pose:render` : lance Vite sur un port libre (arrêté ensuite), ouvre la route **dev uniquement** `/dev/pose-preview` (absente du build de production) avec le vrai viewer, et écrit dans `.pose-renders/<slug>/` (ignoré par git, ou `--out`) un PNG par étape et par vue (`3d` = caméra conseillée, `face` = plan x/y, `profil` = plan z/y, `dessus`) plus `contact-sheet.png`, qui regroupe tout en une image. `--server http://127.0.0.1:5173` réutilise un serveur déjà lancé.
-- La bibliothèque (`@tatamap/pose-kit`) fournit `twoBoneIk`, `buildFighter`, `rotateFighterX/Y/Z`, `translateFighter`, `boneLengthsOf`, `makePose` ; voir `tools/pose-kit/src/`.
+- La bibliothèque (`@tatamap/pose-kit`) fournit `twoBoneIk`, `buildFighter`, `STANDARD_LENGTHS` (le corps standard, longueurs recommandées par défaut pour `buildFighter`), `rotateFighterX/Y/Z`, `translateFighter`, `boneLengthsOf`, `makePose` ; voir `tools/pose-kit/src/`.
 
 ## Commandes utiles
 

@@ -1,7 +1,6 @@
 import {
   type AdminTechnique,
   adminTechniqueSchema,
-  boneLengths,
   type CurrentPose,
   mirrorPose,
   POSE_BOUNDS_CM,
@@ -330,23 +329,20 @@ describe('selectors', () => {
     expect(parsed.data?.steps).toHaveLength(4);
   });
 
-  it('currentWarnings compares with step 1 and is empty on step 1', () => {
+  it('currentWarnings compares with the standard body, step 1 included', () => {
     let state = fresh();
     expect(currentWarnings(state)).toEqual([]);
-    const refForearm = boneLengths(state.technique.steps[0]?.pose.fighters.me as never)[
-      'elbowL-handL'
-    ];
-    expect(refForearm).toBeGreaterThan(0);
-    // Stretch the left hand of step 2 far away: the left forearm warns.
-    state = run(
-      state,
-      { type: 'selectStep', index: 1 },
-      { type: 'setJoint', joint: ME_HAND, position: [200, 100, 0] },
-    );
+    // Stretch the left hand far away: the left forearm warns, even on step 1.
+    state = run(state, { type: 'setJoint', joint: ME_HAND, position: [200, 100, 0] });
+    expect(currentWarnings(state)).not.toEqual([]);
     const warnings = currentWarnings(state);
     expect(warnings.some((w) => w.fighter === 'me' && w.bone === 'elbowL-handL')).toBe(true);
-    state = run(state, { type: 'selectStep', index: 0 });
-    expect(currentWarnings(state)).toEqual([]);
+    expect(warnings.find((w) => w.bone === 'elbowL-handL')?.referenceCm).toBe(33);
+    // Step 2 was not touched: its own bones are what counts, not step 1's.
+    state = run(state, { type: 'selectStep', index: 1 });
+    expect(
+      currentWarnings(state).every((w) => w.fighter === 'me' && w.bone === 'elbowL-handL'),
+    ).toBe(true);
   });
 
   it('currentPublishIssues follows the content', () => {

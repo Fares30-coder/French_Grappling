@@ -3,7 +3,7 @@ import {
   type FighterPoseV1_11,
   JOINTS_V1_11,
   mirrorPose,
-  poseWarnings,
+  standardBodyWarnings,
 } from '@tatamap/shared';
 import { describe, expect, it } from 'vitest';
 import { findContacts, jointsBelowMat, segmentDistance } from './analyze';
@@ -13,6 +13,7 @@ import {
   type FighterSpec,
   makePose,
   rotateFighterX,
+  STANDARD_LENGTHS,
   translateFighter,
 } from './fighter';
 import { distance } from './vec';
@@ -48,17 +49,19 @@ const spec: FighterSpec = {
 };
 
 describe('buildFighter', () => {
-  it('keeps every reference length (poseWarnings stays empty)', () => {
+  it('keeps every reference length', () => {
     const built = buildFighter(lengths, spec);
-    const a = makePose(ref, ref);
-    const b = makePose(built, built);
-    expect(poseWarnings(b, a)).toEqual([]);
     const got = boneLengths(built);
     const want = boneLengths(ref);
     for (const key of Object.keys(want) as Array<keyof typeof want>) {
       expect(Math.abs(got[key] - want[key])).toBeLessThan(0.2); // 0.1 cm rounding per joint
     }
     expect(Math.abs(distance(built.neck, built.head) - lengths.neckHead)).toBeLessThan(0.2);
+  });
+
+  it('builds a fighter on the standard body with STANDARD_LENGTHS', () => {
+    const built = buildFighter(STANDARD_LENGTHS, spec);
+    expect(standardBodyWarnings(makePose(built, built), 0.01)).toEqual([]);
   });
 
   it('puts the hands and feet on reachable targets', () => {

@@ -1,5 +1,4 @@
 import {
-  type BoneKey,
   boneLengths,
   type CameraHint,
   type CurrentPose,
@@ -7,13 +6,34 @@ import {
   type FighterPoseV1_11,
   JOINTS_V1_11,
   SKELETON_V1_11,
+  STANDARD_BODY_V1_11,
+  type StandardBoneKey,
   type Vec3,
 } from '@tatamap/shared';
 import { twoBoneIk } from './ik';
 import { add, distance, scale, unit } from './vec';
 
 /** The 9 cylinder bones of the skeleton plus the neck -> head distance (the head is a sphere). */
-export type FighterLengths = Record<BoneKey, number> & { neckHead: number };
+export type FighterLengths = Record<Exclude<StandardBoneKey, 'neck-head'>, number> & {
+  neckHead: number;
+};
+
+/**
+ * The standard body (about 1.75 m, left = right) as FighterLengths: the recommended default for
+ * `buildFighter`, so every fighter of a technique shares the same realistic proportions.
+ */
+export const STANDARD_LENGTHS: Readonly<FighterLengths> = {
+  'neck-hip': STANDARD_BODY_V1_11['neck-hip'],
+  'neck-elbowL': STANDARD_BODY_V1_11['neck-elbowL'],
+  'elbowL-handL': STANDARD_BODY_V1_11['elbowL-handL'],
+  'neck-elbowR': STANDARD_BODY_V1_11['neck-elbowR'],
+  'elbowR-handR': STANDARD_BODY_V1_11['elbowR-handR'],
+  'hip-kneeL': STANDARD_BODY_V1_11['hip-kneeL'],
+  'kneeL-footL': STANDARD_BODY_V1_11['kneeL-footL'],
+  'hip-kneeR': STANDARD_BODY_V1_11['hip-kneeR'],
+  'kneeR-footR': STANDARD_BODY_V1_11['kneeR-footR'],
+  neckHead: STANDARD_BODY_V1_11['neck-head'],
+};
 
 export type Limb = {
   /** Where the hand or foot should be. */

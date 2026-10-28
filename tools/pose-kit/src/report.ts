@@ -1,4 +1,4 @@
-import { type ContentTechnique, poseWarnings } from '@tatamap/shared';
+import { type ContentTechnique, standardBodyWarnings } from '@tatamap/shared';
 import { findContacts, jointsBelowMat } from './analyze';
 
 export type StepReport = {
@@ -11,20 +11,17 @@ export type StepReport = {
 
 const cm = (n: number) => `${n.toFixed(1)} cm`;
 
-/** Pure: everything `pose:check` prints, per step. Reference for bone lengths = step 1 (as the editor does). */
+/** Pure: everything `pose:check` prints, per step. Bone lengths are checked against the standard body. */
 export function reportTechnique(technique: ContentTechnique): StepReport[] {
-  const reference = technique.steps[0]?.pose;
   return technique.steps.map((step, i) => ({
     index: i + 1,
     title: step.title,
-    boneWarnings: reference
-      ? poseWarnings(step.pose, reference).map(
-          (w) =>
-            `${w.fighter} ${w.bone}: ${cm(w.lengthCm)} (step 1: ${cm(w.referenceCm)}, ${
-              w.lengthCm > w.referenceCm ? '+' : '-'
-            }${Math.round((Math.abs(w.lengthCm - w.referenceCm) / w.referenceCm) * 100)} %)`,
-        )
-      : [],
+    boneWarnings: standardBodyWarnings(step.pose).map(
+      (w) =>
+        `${w.fighter} ${w.bone}: ${cm(w.lengthCm)} (standard: ${cm(w.referenceCm)}, ${
+          w.lengthCm > w.referenceCm ? '+' : '-'
+        }${Math.round((Math.abs(w.lengthCm - w.referenceCm) / w.referenceCm) * 100)} %)`,
+    ),
     underMat: jointsBelowMat(step.pose).map(
       (j) =>
         `${j.fighter} ${j.joint}: y=${j.y.toFixed(1)}, ${

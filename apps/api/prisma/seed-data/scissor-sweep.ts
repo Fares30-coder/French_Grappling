@@ -7,6 +7,10 @@ import {
   type PoseV1_11,
 } from '@tatamap/shared';
 
+// Prototype data kept ONLY as a seed fixture (the seed tests depend on it). The source of truth
+// for content is the private `content/` repo, and these poses, placed by eye, do NOT follow the
+// standard body (STANDARD_BODY_V1_11 in @tatamap/shared): expect bone-length warnings on them.
+//
 // Raw prototype data (CLAUDE.md, "Données du prototype"). 2D: SVG coordinates, y pointing down,
 // floor at y = 306. Joint order: JOINTS_V1_11.
 type Point2 = readonly [number, number];

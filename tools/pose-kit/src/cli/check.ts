@@ -4,7 +4,7 @@ import { countIssues, formatReport, reportTechnique } from '../report';
 const USAGE = `Usage: pnpm pose:check <slug|path.json> [--strict]
 
 Checks one technique of CONTENT_DIR (default content/): schema (blocking), bone lengths against
-step 1 (same 15 % rule as the editor), joints under the mat, rough overlap between fighters.
+the standard body (same 12 % rule as the editor), joints under the mat, rough overlap between fighters.
 Overlap detection is an APPROXIMATE heuristic on the bare skeleton: treat it as a hint.
 Exit code 1 on an invalid file, or on any warning with --strict.`;
 

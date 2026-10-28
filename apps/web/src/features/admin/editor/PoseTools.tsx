@@ -1,4 +1,4 @@
-import type { PoseWarning } from '@tatamap/shared';
+import type { StandardBodyWarning } from '@tatamap/shared';
 import { formatWarning } from './labels';
 
 type Props = {
@@ -13,7 +13,7 @@ type Props = {
   onMirror: (scope: 'step' | 'all') => void;
   playing: boolean;
   onTogglePlay: () => void;
-  warnings: ReadonlyArray<PoseWarning>;
+  warnings: ReadonlyArray<StandardBodyWarning>;
 };
 
 const button = 'rounded border border-slate-300 px-3 py-1 text-sm disabled:opacity-50';
