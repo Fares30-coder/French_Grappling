@@ -29,6 +29,8 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       DATABASE_URL: postgresql://tatamap:tatamap@localhost:5432/tatamap
+      # CI has a single throwaway database: the tests use the same one.
+      TEST_DATABASE_URL: postgresql://tatamap:tatamap@localhost:5432/tatamap
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

@@ -10,8 +10,10 @@ import {
   STEP_TITLES,
 } from './seed-data/scissor-sweep';
 
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) throw new Error('DATABASE_URL is required');
+// `PRISMA_TARGET=test` (pnpm db:test:reset) seeds the test database instead (see prisma.config.ts).
+const urlVariable = process.env.PRISMA_TARGET === 'test' ? 'TEST_DATABASE_URL' : 'DATABASE_URL';
+const databaseUrl = process.env[urlVariable];
+if (!databaseUrl) throw new Error(`${urlVariable} is required`);
 
 const prisma = createPrisma(databaseUrl);
 
