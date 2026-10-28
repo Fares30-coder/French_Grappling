@@ -1,5 +1,6 @@
 import { useParams } from 'react-router';
 import { ApiRequestError } from '../../lib/api';
+import { TechniqueViewer } from '../viewer/TechniqueViewer';
 import { useTechnique } from './use-technique';
 
 export function TechniquePage() {
@@ -20,6 +21,12 @@ export function TechniquePage() {
   return (
     <main className="mx-auto max-w-3xl p-6">
       <h1 className="text-3xl font-bold">{data.name}</h1>
+
+      <TechniqueViewer
+        className="mt-4 aspect-video w-full overflow-hidden rounded-lg"
+        steps={data.steps}
+        stepIndex={0}
+      />
 
       <h2 className="mt-6 text-xl font-semibold">Étapes</h2>
       <ol className="mt-2 list-decimal pl-6">
