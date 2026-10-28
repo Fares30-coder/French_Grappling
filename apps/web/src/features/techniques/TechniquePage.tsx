@@ -15,6 +15,7 @@ export function TechniquePage() {
   const [stepIndex, setStepIndex] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [speed, setSpeed] = useState<Speed>(1);
+  const [cameraKey, setCameraKey] = useState(0);
 
   if (isPending) return <p className="p-6 text-slate-600">Chargement…</p>;
 
@@ -45,6 +46,7 @@ export function TechniquePage() {
         playing={playing}
         speed={speed}
         onStepChange={setStepIndex}
+        cameraKey={cameraKey}
       />
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -71,6 +73,13 @@ export function TechniquePage() {
             </button>
           ))}
         </fieldset>
+        <button
+          type="button"
+          className="rounded border border-slate-300 px-3 py-1.5"
+          onClick={() => setCameraKey((k) => k + 1)}
+        >
+          Recentrer
+        </button>
       </div>
 
       <h2 className="mt-6 text-xl font-semibold">Étapes</h2>
