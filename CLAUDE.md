@@ -52,7 +52,7 @@ Une technique est une **arête entre deux positions** (départ → arrivée, arr
 
 ### Format d'une pose (squelette `v1-11`)
 
-11 articulations par combattant, en (x, y, z), en cm, tatami à y = 0. Ordre : head, neck, hip, elbowL, handL, elbowR, handR, kneeL, footL, kneeR, footR. Combattants : `me` (le pratiquant qui exécute la technique, couleur #1D9E75 ; dessous au départ pour le ciseau) et `opponent` (#D85A30). `camera` optionnelle (angle conseillé par étape). Repère main droite, y vers le haut, 1 unité Three.js = 1 cm ; L/R = gauche/droite propres au combattant. Longueurs d'os = corps standard symétrique (`STANDARD_BODY_V1_11` dans `@tatamap/shared`, ~1,75 m), le même pour les deux combattants, vérifié par l'éditeur et `pose:check`.
+11 articulations par combattant, en (x, y, z), en cm, tatami à y = 0. Ordre : head, neck, hip, elbowL, handL, elbowR, handR, kneeL, footL, kneeR, footR. Combattants : `me` (le pratiquant qui exécute la technique, couleur #1D9E75 ; dessous au départ pour le ciseau) et `opponent` (#D85A30). `camera` optionnelle (angle conseillé par étape). Repère main droite, y vers le haut, 1 unité Three.js = 1 cm ; L/R = gauche/droite propres au combattant (vérifié par `mirroredFighters` dans l'éditeur et `pose:check` ; les données du prototype ci-dessous ont `me` en miroir aux étapes 1 à 4). Longueurs d'os = corps standard symétrique (`STANDARD_BODY_V1_11` dans `@tatamap/shared`, ~1,75 m), le même pour les deux combattants, vérifié par l'éditeur et `pose:check`.
 
 ```json
 {
