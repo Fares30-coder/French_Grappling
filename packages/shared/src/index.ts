@@ -9,6 +9,7 @@ export * from './content';
 export * from './defaults';
 export * from './enums';
 export * from './pose/edit';
+export * from './pose/handedness';
 export * from './pose/pose';
 export * from './pose/skeleton-v1-11';
 export * from './pose/standard-body';

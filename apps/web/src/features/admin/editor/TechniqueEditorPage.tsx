@@ -18,6 +18,7 @@ import { adminErrorMessage } from '../errors';
 import { CameraCapture } from './CameraCapture';
 import { ChainsEditor } from './ChainsEditor';
 import {
+  currentMirrored,
   currentPublishIssues,
   currentWarnings,
   type EditorAction,
@@ -384,6 +385,7 @@ function TechniqueEditor({
               playing={playing}
               onTogglePlay={() => setPlaying((p) => !p)}
               warnings={currentWarnings(state)}
+              mirrored={currentMirrored(state)}
             />
           </div>
           <div className="mt-4">

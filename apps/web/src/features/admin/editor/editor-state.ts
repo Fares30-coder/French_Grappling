@@ -6,6 +6,7 @@ import {
   DEFAULT_TRANSITION_MS,
   type FighterId,
   type JointV1_11,
+  mirroredFighters,
   mirrorPose,
   publishIssues,
   type StandardBodyWarning,
@@ -399,6 +400,12 @@ export function toUpdateInput(state: EditorState): TechniqueUpdateInput {
 export function currentWarnings(state: EditorState): StandardBodyWarning[] {
   const current = state.technique.steps[state.stepIndex];
   return current ? standardBodyWarnings(current.pose) : [];
+}
+
+/** Fighters of the current step whose L/R labels look swapped (mirror image of a real body). */
+export function currentMirrored(state: EditorState): FighterId[] {
+  const current = state.technique.steps[state.stepIndex];
+  return current ? mirroredFighters(current.pose) : [];
 }
 
 export const currentPublishIssues = (state: EditorState): string[] =>
