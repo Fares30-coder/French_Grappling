@@ -20,9 +20,6 @@ const ThumbnailCanvas = lazy(() =>
   import('../viewer/thumbnails').then((m) => ({ default: m.ThumbnailCanvas })),
 );
 
-/** Shown "À la une" when no filter is active. */
-const FEATURED_SLUG = 'ciseau-garde-fermee';
-
 const CATEGORY_PLURALS_FR: Record<Category, string> = {
   submission: 'Soumissions',
   pass: 'Passages de garde',
@@ -121,8 +118,6 @@ export function LibraryPage() {
   const all = list.data?.techniques ?? [];
   const results = useMemo(() => all.filter((t) => techniqueMatchesQuery(t, query)), [all, query]);
   const filtered = hasFilters(query);
-  const featured = filtered ? undefined : results.find((t) => t.slug === FEATURED_SLUG);
-  const grid = featured ? results.filter((t) => t !== featured) : results;
 
   // Only the options that lead somewhere, counted on the whole catalog.
   const count = (pred: (t: TechniqueListItem) => boolean) => all.filter(pred).length;
@@ -265,11 +260,9 @@ export function LibraryPage() {
             </div>
           )}
 
-          {featured && <TechniqueCard technique={featured} featured />}
-
-          {grid.length > 0 && (
+          {results.length > 0 && (
             <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,250px),1fr))] gap-[18px] p-0">
-              {grid.map((t) => (
+              {results.map((t) => (
                 <li key={t.slug} className="flex">
                   <TechniqueCard technique={t} />
                 </li>

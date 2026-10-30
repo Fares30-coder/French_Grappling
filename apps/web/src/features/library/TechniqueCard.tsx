@@ -1,14 +1,12 @@
 import {
   CATEGORY_LABELS_FR,
   DEFAULT_TRANSITION_MS,
-  GI_MODE_LABELS_FR,
   LEVEL_LABELS_FR,
   type TechniqueListItem,
 } from '@tatamap/shared';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { Badge } from '../../ui/Badge';
-import { MonoLabel } from '../../ui/text';
 import { useTechnique } from '../techniques/use-technique';
 
 const TechniqueThumbnail = lazy(() =>
@@ -50,26 +48,18 @@ function useCardPlaying(ref: React.RefObject<HTMLElement | null>) {
 }
 
 /** "Garde fermée → Montée · Débutant" (a submission has no end position). */
-export function techniqueMeta(t: TechniqueListItem, withGi = false): string {
+export function techniqueMeta(t: TechniqueListItem): string {
   const route = t.endPosition
     ? `${t.startPosition.name} → ${t.endPosition.name}`
     : t.startPosition.name;
-  return [route, LEVEL_LABELS_FR[t.level], ...(withGi ? [GI_MODE_LABELS_FR[t.gi]] : [])].join(
-    ' · ',
-  );
+  return `${route} · ${LEVEL_LABELS_FR[t.level]}`;
 }
 
 const thumbBackground =
   'bg-[radial-gradient(ellipse_at_50%_60%,#17332d_0%,#121f24_75%)] relative overflow-hidden';
 
-/** A library card; `featured` is the wide "À la une" one. The 3D loads after the text. */
-export function TechniqueCard({
-  technique,
-  featured = false,
-}: {
-  technique: TechniqueListItem;
-  featured?: boolean;
-}) {
+/** A library card. The 3D thumbnail loads after the text. */
+export function TechniqueCard({ technique }: { technique: TechniqueListItem }) {
   const ref = useRef<HTMLAnchorElement>(null);
   const { playing, handlers } = useCardPlaying(ref);
   // The full steps are fetched only once the card plays (and then cached for the page).
@@ -90,36 +80,21 @@ export function TechniqueCard({
       ref={ref}
       to={`/techniques/${technique.slug}`}
       {...handlers}
-      className={`group flex w-full overflow-hidden rounded-2xl border border-line bg-surface text-ink no-underline transition-colors hover:border-line-stronger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-bright ${
-        featured ? 'flex-col md:grid md:grid-cols-2' : 'flex-col'
-      }`}
+      className="group flex w-full flex-col overflow-hidden rounded-2xl border border-line bg-surface text-ink no-underline transition-colors hover:border-line-stronger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-bright"
     >
-      <div
-        className={`${thumbBackground} ${featured ? 'aspect-[16/10] md:aspect-auto md:min-h-72' : 'aspect-[16/10]'}`}
-      >
+      <div className={`${thumbBackground} aspect-[16/10]`}>
         <Suspense fallback={null}>
           <TechniqueThumbnail steps={steps} playing={playing} className="absolute inset-0" />
         </Suspense>
       </div>
-      <div
-        className={`flex flex-col gap-2 ${featured ? 'justify-center p-6 md:p-8' : 'px-[18px] pt-4 pb-5'}`}
-      >
-        {featured ? (
-          <MonoLabel>À LA UNE · {category.toUpperCase()}</MonoLabel>
-        ) : (
-          <span className="self-start">
-            <Badge tone={tone}>{category}</Badge>
-          </span>
-        )}
-        <span
-          className={`font-bold leading-tight ${featured ? 'text-2xl md:text-[30px]' : 'text-[17px]'}`}
-        >
-          {technique.name}
+      <div className="flex flex-col gap-2 px-[18px] pt-4 pb-5">
+        <span className="self-start">
+          <Badge tone={tone}>{category}</Badge>
         </span>
-        <span className={`text-ink-muted ${featured ? 'text-[15px]' : 'text-[13px]'}`}>
-          {techniqueMeta(technique, featured)} · {technique.stepCount} étapes
+        <span className="text-[17px] font-bold leading-tight">{technique.name}</span>
+        <span className="text-[13px] text-ink-muted">
+          {techniqueMeta(technique)} · {technique.stepCount} étapes
         </span>
-        {featured && <span className="mt-2 font-bold text-accent-bright">Voir la technique →</span>}
       </div>
     </Link>
   );
