@@ -1,5 +1,6 @@
 import { Link, Outlet, ScrollRestoration, useLocation } from 'react-router';
 import { LogoMark } from '../../ui/Logo';
+import { useOnline } from '../offline/use-online';
 import { isActive, NAV_ITEMS } from './nav';
 
 const focusRing =
@@ -78,6 +79,7 @@ function TabBar({ pathname }: { pathname: string }) {
 /** Shell of the public pages: dark theme, sidebar on desktop, tab bar on phones. */
 export function PublicLayout() {
   const { pathname } = useLocation();
+  const online = useOnline();
   return (
     // overflow-x-clip: a public page never scrolls sideways, whatever a child does.
     <div className="flex min-h-dvh overflow-x-clip bg-ground font-sans text-ink antialiased">
@@ -98,6 +100,14 @@ export function PublicLayout() {
             <span className="text-lg font-bold">Tatamap</span>
           </Link>
         </header>
+        {!online && (
+          <p
+            role="status"
+            className="m-0 border-b border-line bg-accent-tint px-4 py-2.5 text-center text-sm text-ink"
+          >
+            Hors ligne : tu consultes les techniques enregistrées sur cet appareil.
+          </p>
+        )}
         <div id="contenu" className="flex-1 pb-28 md:pb-0">
           <Outlet />
         </div>
