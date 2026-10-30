@@ -2,6 +2,7 @@ import { apiErrorSchema, currentPoseSchema, techniqueDetailSchema } from '@tatam
 import { afterAll, describe, expect, it } from 'vitest';
 import { buildScissorPoses } from '../../prisma/seed-data/scissor-sweep';
 import { createPrisma } from '../db';
+import { PUBLIC_CACHE_CONTROL } from '../routes/techniques';
 import { buildTestApp } from '../test-utils';
 import { toStepCreateData } from './step-data';
 
@@ -18,7 +19,7 @@ describe('GET /api/techniques/:slug', () => {
   it('returns the seeded scissor sweep', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/techniques/ciseau-garde-fermee' });
     expect(res.statusCode).toBe(200);
-    expect(res.headers['cache-control']).toBe('public, max-age=60');
+    expect(res.headers['cache-control']).toBe(PUBLIC_CACHE_CONTROL);
     const t = techniqueDetailSchema.parse(res.json());
     expect(t.steps.map((s) => s.order)).toEqual([1, 2, 3, 4, 5]);
     expect(t.startPosition.slug).toBe('garde-fermee');
