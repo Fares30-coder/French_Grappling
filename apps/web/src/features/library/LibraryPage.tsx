@@ -6,7 +6,7 @@ import {
   type TechniqueListItem,
   techniqueMatchesQuery,
 } from '@tatamap/shared';
-import { lazy, Suspense, useId, useMemo } from 'react';
+import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { buttonClass } from '../../ui/button';
 import { Chip } from '../../ui/Chip';
@@ -85,19 +85,44 @@ function CardSkeletons() {
 
 export function LibraryPage() {
   const [params, setParams] = useSearchParams();
-  const query = useMemo(() => readFilters(params), [params]);
   const list = useTechniqueList();
   const positions = usePositions();
   const searchId = useId();
+
+  // Functional update: always build on the latest URL, not on this render's copy.
+  const setFilter = (key: FilterKey | 'q', value: string | undefined) =>
+    setParams((prev) => withFilter(prev, key, value), { replace: key === 'q' });
+
+  // The search box owns its raw text (spaces included) and filters at once; the URL follows
+  // 200 ms after the last keystroke. It adopts the URL's `q` only when no write is pending
+  // (back/forward, a shared link, "Effacer les filtres").
+  const urlQ = params.get('q') ?? '';
+  const [searchText, setSearchText] = useState(urlQ);
+  const pendingWrite = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (pendingWrite.current === null) setSearchText(urlQ);
+  }, [urlQ]);
+  useEffect(() => () => clearTimeout(pendingWrite.current ?? undefined), []);
+  const onSearch = (text: string) => {
+    setSearchText(text);
+    clearTimeout(pendingWrite.current ?? undefined);
+    pendingWrite.current = setTimeout(() => {
+      pendingWrite.current = null;
+      setFilter('q', text);
+    }, 200);
+  };
+
+  const query = useMemo(() => {
+    const { q: _fromUrl, ...filters } = readFilters(params);
+    const q = searchText.trim();
+    return q ? { ...filters, q } : filters;
+  }, [params, searchText]);
 
   const all = list.data?.techniques ?? [];
   const results = useMemo(() => all.filter((t) => techniqueMatchesQuery(t, query)), [all, query]);
   const filtered = hasFilters(query);
   const featured = filtered ? undefined : results.find((t) => t.slug === FEATURED_SLUG);
   const grid = featured ? results.filter((t) => t !== featured) : results;
-
-  const setFilter = (key: FilterKey | 'q', value: string | undefined) =>
-    setParams(withFilter(params, key, value), { replace: key === 'q' });
 
   // Only the options that lead somewhere, counted on the whole catalog.
   const count = (pred: (t: TechniqueListItem) => boolean) => all.filter(pred).length;
@@ -157,8 +182,8 @@ export function LibraryPage() {
             <input
               id={searchId}
               type="search"
-              value={query.q ?? ''}
-              onChange={(e) => setFilter('q', e.target.value)}
+              value={searchText}
+              onChange={(e) => onSearch(e.target.value)}
               placeholder="Rechercher une technique, un tag…"
               className="min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-ink-faint"
             />
@@ -228,7 +253,12 @@ export function LibraryPage() {
               <button
                 type="button"
                 className={buttonClass('secondary')}
-                onClick={() => setParams(new URLSearchParams(), { replace: true })}
+                onClick={() => {
+                  clearTimeout(pendingWrite.current ?? undefined);
+                  pendingWrite.current = null;
+                  setSearchText('');
+                  setParams(new URLSearchParams(), { replace: true });
+                }}
               >
                 Effacer les filtres
               </button>
