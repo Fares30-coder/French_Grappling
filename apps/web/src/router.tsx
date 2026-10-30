@@ -2,8 +2,9 @@ import { createBrowserRouter, Navigate, useParams } from 'react-router';
 import { HomePage } from './features/home/HomePage';
 import { PublicLayout } from './features/layout/PublicLayout';
 import { LibraryPage } from './features/library/LibraryPage';
+import { MapPage } from './features/map/MapPage';
 import { TechniquePage } from './features/techniques/TechniquePage';
-import { MapPage, NotFoundPage, RouteErrorPage } from './pages/placeholders';
+import { NotFoundPage, RouteErrorPage } from './pages/errors';
 
 // Keyed by slug so TechniquePage local state (current step...) resets when the technique changes.
 function KeyedTechniquePage() {

@@ -4,28 +4,6 @@ import { PageHeader } from '../ui/text';
 
 const pageClass = 'mx-auto flex max-w-[1200px] flex-col gap-8 px-4 py-10 md:px-16 md:py-14';
 
-function UnderConstruction({ children }: { children: string }) {
-  return (
-    <section className="rounded-2xl border border-line bg-surface p-6 text-ink-muted">
-      <p className="m-0">{children}</p>
-    </section>
-  );
-}
-
-// Provisional page (phase 3, lot 1): filled in lot 6.
-export function MapPage() {
-  return (
-    <main className={pageClass}>
-      <PageHeader
-        eyebrow="Vois comment tout s'enchaîne"
-        title="La carte des positions"
-        lead="Chaque position est un lieu, chaque technique un chemin."
-      />
-      <UnderConstruction>La carte des positions arrive bientôt.</UnderConstruction>
-    </main>
-  );
-}
-
 export function NotFoundPage() {
   return (
     <main className={pageClass}>
