@@ -4,6 +4,7 @@ export * from './admin/position';
 export * from './admin/publish';
 export * from './admin/tag';
 export * from './admin/technique';
+export * from './catalog';
 export * from './common';
 export * from './content';
 export * from './defaults';
