@@ -38,3 +38,9 @@
   --color-opponent-soft: #f3a383;
   --color-opponent-tint: #3a2119;
 }
+
+/* Dark behind every page, so overscroll (iOS bounce) never flashes white. The admin paints its
+   own light background on top. */
+html {
+  background-color: var(--color-ground);
+}

@@ -79,7 +79,8 @@ function TabBar({ pathname }: { pathname: string }) {
 export function PublicLayout() {
   const { pathname } = useLocation();
   return (
-    <div className="flex min-h-dvh bg-ground font-sans text-ink antialiased">
+    // overflow-x-clip: a public page never scrolls sideways, whatever a child does.
+    <div className="flex min-h-dvh overflow-x-clip bg-ground font-sans text-ink antialiased">
       <a
         href="#contenu"
         className="sr-only z-30 rounded-md bg-accent px-4 py-2 font-bold text-on-accent focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
