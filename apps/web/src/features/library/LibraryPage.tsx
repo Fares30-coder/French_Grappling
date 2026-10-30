@@ -44,8 +44,10 @@ function ChipGroup({
   onToggle: (value: string | undefined) => void;
 }) {
   if (options.length === 0) return null;
+  // `relative`: the sr-only legend is absolutely positioned; without a positioned ancestor it
+  // escapes the scrolling pill row and widens the whole page on phones.
   return (
-    <fieldset className="m-0 flex shrink-0 gap-2 border-0 p-0 md:flex-wrap">
+    <fieldset className="relative m-0 flex shrink-0 gap-2 border-0 p-0 md:flex-wrap">
       <legend className="sr-only">{label}</legend>
       {options.map((o) => (
         <Chip
