@@ -1,8 +1,8 @@
 import { createBrowserRouter, Navigate, useParams } from 'react-router';
+import { HomePage } from './features/home/HomePage';
 import { PublicLayout } from './features/layout/PublicLayout';
 import { LibraryPage } from './features/library/LibraryPage';
 import { TechniquePage } from './features/techniques/TechniquePage';
-import { HomePage } from './pages/HomePage';
 import { MapPage, NotFoundPage, RouteErrorPage } from './pages/placeholders';
 
 // Keyed by slug so TechniquePage local state (current step...) resets when the technique changes.
