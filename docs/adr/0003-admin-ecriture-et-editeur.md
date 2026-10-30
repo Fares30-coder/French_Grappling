@@ -673,6 +673,8 @@ Règles :
 
 Ce que cela impose **dès la phase 2** (et que D1 respecte) : `TechniqueScene` ne dépend d'aucune prop du `<Canvas>` (caméra, fond), possède sa propre caméra `makeDefault`, et ne touche pas à `gl` globalement. Repli si `View` déçoit : image statique générée par le viewer (`toDataURL`) et 3D au survol uniquement.
 
+**Mise à jour (phase 3, lot 3).** Le repli est appliqué. Sur téléphone, le `<Canvas>` fixe et ses `<View>` sont redessinés après le défilement natif de la page : les vignettes glissaient par rapport à leurs cartes. Chaque carte affiche maintenant une image fixe de l'étape 1, rendue une fois par session par un `<Canvas>` hors écran (une image à la fois, puis il se démonte), et seule la carte qui joue (survol, ou centre de l'écran sur téléphone) monte son propre petit `<Canvas>`. Toujours au plus un ou deux contextes WebGL à la fois.
+
 ---
 
 ## Conséquences

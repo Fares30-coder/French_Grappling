@@ -8,9 +8,10 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { Badge } from '../../ui/Badge';
 import { useTechnique } from '../techniques/use-technique';
+import { requestSnapshot, useSnapshot } from '../viewer/thumbnail-store';
 
-const TechniqueThumbnail = lazy(() =>
-  import('../viewer/thumbnails').then((m) => ({ default: m.TechniqueThumbnail })),
+const LiveThumbnail = lazy(() =>
+  import('../viewer/thumbnails').then((m) => ({ default: m.LiveThumbnail })),
 );
 
 const matches = (query: string): boolean =>
@@ -55,8 +56,8 @@ export function techniqueMeta(t: TechniqueListItem): string {
   return `${route} · ${LEVEL_LABELS_FR[t.level]}`;
 }
 
-const thumbBackground =
-  'bg-[radial-gradient(ellipse_at_50%_60%,#17332d_0%,#121f24_75%)] relative overflow-hidden';
+/** Same color as the stills (PUBLIC_SCENE.thumbnail), shown until the image is ready. */
+const thumbBackground = 'relative overflow-hidden bg-[#14272a]';
 
 /** A library card. The 3D thumbnail loads after the text. */
 export function TechniqueCard({ technique }: { technique: TechniqueListItem }) {
@@ -72,6 +73,10 @@ export function TechniqueCard({ technique }: { technique: TechniqueListItem }) {
     [detail.data, technique.preview],
   );
 
+  // The still image scrolls with the page like any image; only a playing card runs WebGL.
+  useEffect(() => requestSnapshot(technique.slug, technique.preview), [technique]);
+  const snapshot = useSnapshot(technique.slug);
+
   const tone = technique.category === 'submission' ? 'submission' : 'sweep';
   const category = CATEGORY_LABELS_FR[technique.category];
 
@@ -83,9 +88,16 @@ export function TechniqueCard({ technique }: { technique: TechniqueListItem }) {
       className="group flex w-full flex-col overflow-hidden rounded-2xl border border-line bg-surface text-ink no-underline transition-colors hover:border-line-stronger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-bright"
     >
       <div className={`${thumbBackground} aspect-[16/10]`}>
-        <Suspense fallback={null}>
-          <TechniqueThumbnail steps={steps} playing={playing} className="absolute inset-0" />
-        </Suspense>
+        {snapshot && (
+          <img src={snapshot} alt="" className="absolute inset-0 size-full object-cover" />
+        )}
+        {playing && (
+          <div className="absolute inset-0">
+            <Suspense fallback={null}>
+              <LiveThumbnail steps={steps} />
+            </Suspense>
+          </div>
+        )}
       </div>
       <div className="flex flex-col gap-2 px-[18px] pt-4 pb-5">
         <span className="self-start">

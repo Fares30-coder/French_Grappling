@@ -11,13 +11,12 @@ import { useSearchParams } from 'react-router';
 import { buttonClass } from '../../ui/button';
 import { Chip } from '../../ui/Chip';
 import { PageHeader } from '../../ui/text';
-import { ThumbnailPlayingProvider } from '../viewer/thumbnail-playing';
 import { type FilterKey, hasFilters, readFilters, withFilter } from './filters';
 import { TechniqueCard } from './TechniqueCard';
 import { usePositions, useTechniqueList } from './use-catalog';
 
-const ThumbnailCanvas = lazy(() =>
-  import('../viewer/thumbnails').then((m) => ({ default: m.ThumbnailCanvas })),
+const SnapshotRenderer = lazy(() =>
+  import('../viewer/thumbnails').then((m) => ({ default: m.SnapshotRenderer })),
 );
 
 const CATEGORY_PLURALS_FR: Record<Category, string> = {
@@ -139,7 +138,7 @@ export function LibraryPage() {
   ];
 
   return (
-    <ThumbnailPlayingProvider>
+    <>
       <title>Bibliothèque · Tatamap</title>
       <main className="mx-auto flex max-w-[1200px] flex-col gap-8 px-4 py-8 md:px-16 md:py-14">
         <div className="flex flex-wrap items-end justify-between gap-6">
@@ -275,9 +274,9 @@ export function LibraryPage() {
       </main>
       {list.data && (
         <Suspense fallback={null}>
-          <ThumbnailCanvas />
+          <SnapshotRenderer />
         </Suspense>
       )}
-    </ThumbnailPlayingProvider>
+    </>
   );
 }
