@@ -1,67 +1,81 @@
-import { View } from '@react-three/drei';
-import { Canvas, useThree } from '@react-three/fiber';
-import { useEffect } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { DEFAULT_TRANSITION_MS } from '@tatamap/shared';
+import { Fragment, useRef } from 'react';
 import { TechniqueScene, type ViewerStep } from './TechniqueScene';
 import { PUBLIC_SCENE } from './theme';
-import { useAnyThumbnailPlaying, useRegisterPlaying } from './thumbnail-playing';
+import { setSnapshot, usePendingSnapshot } from './thumbnail-store';
 
 // Lazy-loaded by the library: three.js stays out of the first paint.
+//
+// ADR 0003 D4, fallback: a fixed canvas with drei Views lagged behind the cards while scrolling
+// on phones. Cards now show still images (rendered here, one at a time, by an off-screen canvas)
+// and only the playing card mounts a live canvas inside itself.
 
-/**
- * ADR 0003 D4: ONE fixed, transparent <Canvas> over the page and one drei <View> per thumbnail,
- * so a grid of cards uses a single WebGL context. Render once per page, inside a
- * ThumbnailPlayingProvider. Above the cards, below the phone tab bar (z-20).
- */
-export function ThumbnailCanvas() {
-  const playing = useAnyThumbnailPlaying();
+/** Size of the still images: the cards' 16:10 frame. */
+const SNAPSHOT_WIDTH = 480;
+const SNAPSHOT_HEIGHT = 300;
+const FRAMING_MARGIN = 1.15;
+
+/** Renders the queued stills, one per mount, then unmounts (freeing its WebGL context). */
+export function SnapshotRenderer() {
+  const pending = usePendingSnapshot();
+  if (!pending) return null;
   return (
-    <Canvas
+    <div
       aria-hidden="true"
-      frameloop={playing ? 'always' : 'demand'}
-      dpr={[1, 2]}
-      gl={{ alpha: true, antialias: true }}
-      style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10 }}
+      style={{
+        position: 'fixed',
+        left: -10_000,
+        top: 0,
+        width: SNAPSHOT_WIDTH,
+        height: SNAPSHOT_HEIGHT,
+        pointerEvents: 'none',
+      }}
     >
-      <View.Port />
-      <InvalidateOnScroll />
-    </Canvas>
+      <Canvas dpr={1} frameloop="always">
+        <color attach="background" args={[PUBLIC_SCENE.thumbnail]} />
+        {/* Keyed: a fresh scene and capture for each image. */}
+        <Fragment key={pending.key}>
+          <TechniqueScene
+            steps={[{ pose: pending.pose, transitionMs: DEFAULT_TRANSITION_MS }]}
+            stepIndex={0}
+            playing={false}
+            interactive={false}
+            framingMargin={FRAMING_MARGIN}
+            tatamiColor={PUBLIC_SCENE.tatami}
+          />
+          <Capture onCapture={(url) => setSnapshot(pending.key, url)} />
+        </Fragment>
+      </Canvas>
+    </div>
   );
 }
 
-/** Rendering on demand: redraw when the page scrolls or resizes, so views follow their cards. */
-function InvalidateOnScroll() {
-  const invalidate = useThree((s) => s.invalidate);
-  useEffect(() => {
-    const redraw = () => invalidate();
-    window.addEventListener('scroll', redraw, { passive: true });
-    window.addEventListener('resize', redraw);
-    return () => {
-      window.removeEventListener('scroll', redraw);
-      window.removeEventListener('resize', redraw);
-    };
-  }, [invalidate]);
+/** Takes over rendering and captures the canvas on the 2nd frame (pose and camera are set). */
+function Capture({ onCapture }: { onCapture: (url: string) => void }) {
+  const frames = useRef(0);
+  useFrame(({ gl, scene, camera }) => {
+    gl.render(scene, camera);
+    frames.current += 1;
+    // Read right after rendering: no preserveDrawingBuffer needed.
+    if (frames.current === 2) onCapture(gl.domElement.toDataURL('image/webp', 0.85));
+  }, 1);
   return null;
 }
 
-type TechniqueThumbnailProps = {
-  steps: ReadonlyArray<ViewerStep>;
-  playing: boolean;
-  className?: string;
-};
-
-/** A non-interactive 3D preview drawn by the shared canvas. Shows step 1 until it plays. */
-export function TechniqueThumbnail({ steps, playing, className }: TechniqueThumbnailProps) {
-  useRegisterPlaying(playing);
+/** The playing card's own small live canvas, same framing and colors as its still image. */
+export function LiveThumbnail({ steps }: { steps: ReadonlyArray<ViewerStep> }) {
   return (
-    <View className={className}>
+    <Canvas aria-hidden="true" dpr={[1, 2]} frameloop="always">
+      <color attach="background" args={[PUBLIC_SCENE.thumbnail]} />
       <TechniqueScene
         steps={steps}
         stepIndex={0}
-        playing={playing}
+        playing
         interactive={false}
-        framingMargin={1.15}
+        framingMargin={FRAMING_MARGIN}
         tatamiColor={PUBLIC_SCENE.tatami}
       />
-    </View>
+    </Canvas>
   );
 }
