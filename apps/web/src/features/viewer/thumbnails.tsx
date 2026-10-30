@@ -59,6 +59,7 @@ export function TechniqueThumbnail({ steps, playing, className }: TechniqueThumb
         stepIndex={0}
         playing={playing}
         interactive={false}
+        framingMargin={1.15}
         tatamiColor={PUBLIC_SCENE.tatami}
       />
     </View>

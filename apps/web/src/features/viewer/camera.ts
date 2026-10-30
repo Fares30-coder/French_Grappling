@@ -61,3 +61,20 @@ export function frameCamera(
       };
   }
 }
+
+/** Aspect ratio the step cameras are placed for (the editor's 16:9 viewer). */
+export const REFERENCE_ASPECT = 16 / 9;
+
+/**
+ * Pulls a perspective camera back along its line of sight, keeping its target: by `margin`
+ * (> 1 leaves room around the fighters, e.g. thumbnails) and further on viewports narrower than
+ * the reference, so the same width of scene stays visible (the field of view is vertical).
+ */
+export function fitStepCamera(position: Vec3, target: Vec3, aspect: number, margin = 1): Vec3 {
+  const factor = margin * Math.max(1, REFERENCE_ASPECT / Math.max(aspect, 0.1));
+  return [
+    target[0] + (position[0] - target[0]) * factor,
+    target[1] + (position[1] - target[1]) * factor,
+    target[2] + (position[2] - target[2]) * factor,
+  ];
+}
