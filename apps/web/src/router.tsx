@@ -1,6 +1,8 @@
 import { createBrowserRouter, Navigate, useParams } from 'react-router';
+import { PublicLayout } from './features/layout/PublicLayout';
 import { TechniquePage } from './features/techniques/TechniquePage';
 import { HomePage } from './pages/HomePage';
+import { LibraryPage, MapPage, NotFoundPage, RouteErrorPage } from './pages/placeholders';
 
 // Keyed by slug so TechniquePage local state (current step...) resets when the technique changes.
 function KeyedTechniquePage() {
@@ -23,8 +25,23 @@ const devRoutes = import.meta.env.DEV
 
 // The admin is lazy-loaded: the editor and its 3D tools never weigh on the public bundle.
 export const router = createBrowserRouter([
-  { path: '/', element: <HomePage /> },
-  { path: '/techniques/:slug', element: <KeyedTechniquePage /> },
+  {
+    // Public pages share the dark shell; the pathless child keeps the shell around route errors.
+    element: <PublicLayout />,
+    errorElement: <RouteErrorPage />,
+    children: [
+      {
+        errorElement: <RouteErrorPage />,
+        children: [
+          { index: true, element: <HomePage /> },
+          { path: 'bibliotheque', element: <LibraryPage /> },
+          { path: 'techniques/:slug', element: <KeyedTechniquePage /> },
+          { path: 'carte', element: <MapPage /> },
+          { path: '*', element: <NotFoundPage /> },
+        ],
+      },
+    ],
+  },
   ...devRoutes,
   {
     path: '/admin/login',

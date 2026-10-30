@@ -1,0 +1,76 @@
+import { isRouteErrorResponse, Link, useRouteError } from 'react-router';
+import { buttonClass } from '../ui/button';
+import { PageHeader } from '../ui/text';
+
+const pageClass = 'mx-auto flex max-w-[1200px] flex-col gap-8 px-4 py-10 md:px-16 md:py-14';
+
+function UnderConstruction({ children }: { children: string }) {
+  return (
+    <section className="rounded-2xl border border-line bg-surface p-6 text-ink-muted">
+      <p className="m-0">{children}</p>
+    </section>
+  );
+}
+
+// Provisional pages (phase 3, lot 1): filled in lots 3 and 6.
+export function LibraryPage() {
+  return (
+    <main className={pageClass}>
+      <PageHeader
+        eyebrow="Ton espace d'apprentissage"
+        title="La bibliothèque"
+        lead="Chaque mouvement a sa place. Trouve le tien."
+      />
+      <UnderConstruction>La bibliothèque arrive bientôt.</UnderConstruction>
+      <Link to="/techniques/ciseau-garde-fermee" className={buttonClass('secondary', 'self-start')}>
+        Voir le ciseau depuis la garde fermée
+      </Link>
+    </main>
+  );
+}
+
+export function MapPage() {
+  return (
+    <main className={pageClass}>
+      <PageHeader
+        eyebrow="Vois comment tout s'enchaîne"
+        title="La carte des positions"
+        lead="Chaque position est un lieu, chaque technique un chemin."
+      />
+      <UnderConstruction>La carte des positions arrive bientôt.</UnderConstruction>
+    </main>
+  );
+}
+
+export function NotFoundPage() {
+  return (
+    <main className={pageClass}>
+      <PageHeader
+        eyebrow="Erreur 404"
+        title="Page introuvable"
+        lead="Cette page n'existe pas, ou plus."
+      />
+      <Link to="/bibliotheque" className={buttonClass('primary', 'self-start')}>
+        Retour à la bibliothèque
+      </Link>
+    </main>
+  );
+}
+
+/** Router error element of the public pages (a crash or a 404 thrown by a loader). */
+export function RouteErrorPage() {
+  const error = useRouteError();
+  if (isRouteErrorResponse(error) && error.status === 404) return <NotFoundPage />;
+  return (
+    <main className={pageClass}>
+      <PageHeader
+        eyebrow="Oups"
+        title="Une erreur est survenue"
+        lead="Recharge la page ; si le problème continue, réessaie plus tard."
+      />
+      <Link to="/" className={buttonClass('primary', 'self-start')}>
+        Retour à l'accueil
+      </Link>
+    </main>
+  );
+}

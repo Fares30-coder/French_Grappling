@@ -1,1 +1,40 @@
 @import "tailwindcss";
+@import "@fontsource-variable/dm-sans";
+@import "@fontsource-variable/jetbrains-mono";
+
+/*
+ * Design tokens of the public site (dark only), from the validated mockup
+ * (docs/plan-phase-3.md). Usable as Tailwind utilities: bg-ground, text-ink-muted, border-line...
+ * The admin keeps the default light palette (slate).
+ */
+@theme {
+  --font-sans: "DM Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+
+  --color-ground: #0f1a1f;
+  --color-ground-deep: #111d22;
+  --color-surface: #16242a;
+  --color-surface-sunken: #121f24;
+  --color-line: #24363d;
+  --color-line-strong: #2e444c;
+  --color-line-stronger: #3a5058;
+
+  --color-ink: #e8efee;
+  --color-ink-soft: #c9d6d4;
+  --color-ink-muted: #a9bbb8;
+  --color-ink-faint: #8fa3a0;
+
+  /* `me` and the brand accent. Text on a filled accent uses on-accent (AA contrast). */
+  --color-accent: #1d9e75;
+  --color-accent-bright: #3cc596;
+  --color-accent-soft: #7bddb9;
+  --color-accent-wash: #1a3330;
+  --color-accent-tint: #133429;
+  --color-on-accent: #06130f;
+
+  /* The opponent; also submissions and common mistakes. */
+  --color-opponent: #d85a30;
+  --color-opponent-bright: #ee8460;
+  --color-opponent-soft: #f3a383;
+  --color-opponent-tint: #3a2119;
+}

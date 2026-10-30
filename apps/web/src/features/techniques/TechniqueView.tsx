@@ -1,5 +1,6 @@
 import type { TechniqueDetail } from '@tatamap/shared';
 import { useState } from 'react';
+import { buttonClass } from '../../ui/button';
 import { TechniqueViewer } from '../viewer/TechniqueViewer';
 
 const SPEEDS = [0.5, 1, 2] as const;
@@ -25,11 +26,12 @@ export function TechniqueView({ technique: data }: { technique: TechniqueDetail 
   };
 
   return (
-    <main className="mx-auto max-w-3xl p-6">
+    <main className="mx-auto max-w-3xl bg-ground p-4 text-ink md:p-6">
       <h1 className="text-3xl font-bold">{data.name}</h1>
 
       <TechniqueViewer
-        className="mt-4 aspect-video w-full overflow-hidden rounded-lg"
+        className="mt-4 aspect-video w-full overflow-hidden rounded-2xl border border-line"
+        background="#121f24"
         steps={data.steps}
         stepIndex={stepIndex}
         playing={playing}
@@ -41,7 +43,7 @@ export function TechniqueView({ technique: data }: { technique: TechniqueDetail 
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button
           type="button"
-          className="rounded bg-emerald-700 px-4 py-1.5 font-medium text-white"
+          className={buttonClass('primary')}
           onClick={() => setPlaying((p) => !p)}
         >
           {playing ? 'Pause' : 'Lecture'}
@@ -53,8 +55,10 @@ export function TechniqueView({ technique: data }: { technique: TechniqueDetail 
               key={s}
               type="button"
               aria-pressed={s === speed}
-              className={`rounded border px-3 py-1.5 ${
-                s === speed ? 'border-emerald-700 bg-emerald-50 font-semibold' : 'border-slate-300'
+              className={`min-h-11 rounded-[10px] border px-3 ${
+                s === speed
+                  ? 'border-accent bg-accent-wash font-bold text-ink'
+                  : 'border-line-strong bg-surface text-ink-soft'
               }`}
               onClick={() => setSpeed(s)}
             >
@@ -64,7 +68,7 @@ export function TechniqueView({ technique: data }: { technique: TechniqueDetail 
         </fieldset>
         <button
           type="button"
-          className="rounded border border-slate-300 px-3 py-1.5"
+          className={buttonClass('secondary')}
           onClick={() => setCameraKey((k) => k + 1)}
         >
           Recentrer
@@ -72,14 +76,16 @@ export function TechniqueView({ technique: data }: { technique: TechniqueDetail 
       </div>
 
       <h2 className="mt-6 text-xl font-semibold">Étapes</h2>
-      <ol className="mt-2 space-y-1">
+      <ol className="mt-2 space-y-2">
         {data.steps.map((step, i) => (
           <li key={step.order}>
             <button
               type="button"
               aria-current={i === stepIndex ? 'step' : undefined}
-              className={`w-full rounded px-3 py-2 text-left ${
-                i === stepIndex ? 'bg-emerald-100 font-semibold' : 'hover:bg-slate-100'
+              className={`min-h-11 w-full rounded-xl border px-3.5 py-2.5 text-left ${
+                i === stepIndex
+                  ? 'border-accent bg-accent-wash font-semibold text-ink'
+                  : 'border-line bg-surface text-ink-soft hover:border-line-strong'
               }`}
               onClick={() => goToStep(i)}
             >
@@ -88,7 +94,7 @@ export function TechniqueView({ technique: data }: { technique: TechniqueDetail 
           </li>
         ))}
       </ol>
-      {currentStep?.text && <p className="mt-3 text-slate-700">{currentStep.text}</p>}
+      {currentStep?.text && <p className="mt-3 text-ink-muted">{currentStep.text}</p>}
 
       <h2 className="mt-6 text-xl font-semibold">Points clés</h2>
       <ul className="mt-2 list-disc pl-6">
