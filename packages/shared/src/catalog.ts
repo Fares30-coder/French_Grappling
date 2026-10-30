@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { slugSchema } from './common';
-import { categorySchema, giModeSchema, levelSchema } from './enums';
+import { categorySchema, type GiMode, giModeSchema, levelSchema } from './enums';
 import { currentPoseSchema } from './pose/pose';
 import { positionSummarySchema, tagSchema, techniqueSummarySchema } from './technique';
 
@@ -74,4 +74,32 @@ export function searchKey(text: string): string {
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')
     .toLowerCase();
+}
+
+/** True when every word of `q` appears in one of `texts` (case and accents ignored). */
+export function matchesSearch(texts: ReadonlyArray<string>, q: string | undefined): boolean {
+  if (!q) return true;
+  const haystack = searchKey(texts.join(' '));
+  return searchKey(q)
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((word) => haystack.includes(word));
+}
+
+/** `gi=gi` and `gi=nogi` also match techniques done in both; `gi=both` only those. */
+export const matchesGi = (technique: GiMode, wanted: GiMode | undefined): boolean =>
+  !wanted || technique === wanted || (wanted !== 'both' && technique === 'both');
+
+/**
+ * The `GET /api/techniques` filters applied to an already loaded list item: the library filters
+ * the full list in the browser (instant, and works offline) with the same rules as the API.
+ */
+export function techniqueMatchesQuery(item: TechniqueListItem, query: TechniqueListQuery): boolean {
+  return (
+    (!query.categorie || item.category === query.categorie) &&
+    (!query.niveau || item.level === query.niveau) &&
+    (!query.position || item.startPosition.slug === query.position) &&
+    matchesGi(item.gi, query.gi) &&
+    matchesSearch([item.name, ...item.tags.map((t) => t.name)], query.q)
+  );
 }

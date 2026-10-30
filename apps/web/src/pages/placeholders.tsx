@@ -12,23 +12,7 @@ function UnderConstruction({ children }: { children: string }) {
   );
 }
 
-// Provisional pages (phase 3, lot 1): filled in lots 3 and 6.
-export function LibraryPage() {
-  return (
-    <main className={pageClass}>
-      <PageHeader
-        eyebrow="Ton espace d'apprentissage"
-        title="La bibliothèque"
-        lead="Chaque mouvement a sa place. Trouve le tien."
-      />
-      <UnderConstruction>La bibliothèque arrive bientôt.</UnderConstruction>
-      <Link to="/techniques/ciseau-garde-fermee" className={buttonClass('secondary', 'self-start')}>
-        Voir le ciseau depuis la garde fermée
-      </Link>
-    </main>
-  );
-}
-
+// Provisional page (phase 3, lot 1): filled in lot 6.
 export function MapPage() {
   return (
     <main className={pageClass}>

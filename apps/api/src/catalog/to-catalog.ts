@@ -1,10 +1,10 @@
 import {
   type Graph,
   graphSchema,
+  matchesSearch,
   type PositionList,
   poseSchema,
   positionListSchema,
-  searchKey,
   type TagList,
   type TechniqueList,
   tagListSchema,
@@ -22,15 +22,8 @@ const toPositionSummary = (p: { slug: string; name: string; role: PositionCountR
   role: p.role,
 });
 
-/** True when every word of `q` appears in the technique name or one of its tags (accents ignored). */
-function matches(row: TechniqueListRow, q: string | undefined): boolean {
-  if (!q) return true;
-  const haystack = searchKey([row.name, ...row.tags.map((t) => t.name)].join(' '));
-  return searchKey(q)
-    .split(/\s+/)
-    .filter(Boolean)
-    .every((word) => haystack.includes(word));
-}
+const matches = (row: TechniqueListRow, q: string | undefined): boolean =>
+  matchesSearch([row.name, ...row.tags.map((t) => t.name)], q);
 
 /** Maps rows to the public list, filtered by `q`, sorted by name; validated like the detail. */
 export function toTechniqueList(rows: TechniqueListRow[], q: string | undefined): TechniqueList {
