@@ -1,6 +1,6 @@
 import { type CameraHint, DEFAULT_CAMERA } from '@tatamap/shared';
 import { describe, expect, it } from 'vitest';
-import { frameCamera, type Vec3 } from './camera';
+import { fitStepCamera, frameCamera, REFERENCE_ASPECT, type Vec3 } from './camera';
 
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const cross = (a: Vec3, b: Vec3): Vec3 => [
@@ -63,5 +63,24 @@ describe('frameCamera', () => {
     const wide = frameCamera('front', undefined, 800).zoom ?? 0;
     expect(narrow).toBeGreaterThan(0);
     expect(wide / narrow).toBeCloseTo(2);
+  });
+});
+
+describe('fitStepCamera', () => {
+  const position: Vec3 = [100, 100, 100];
+  const target: Vec3 = [0, 50, 0];
+
+  it('keeps the camera at the reference aspect without margin', () => {
+    expect(fitStepCamera(position, target, REFERENCE_ASPECT)).toEqual(position);
+    expect(fitStepCamera(position, target, 2.5)).toEqual(position);
+  });
+
+  it('pulls back along the line of sight for a margin or a narrower viewport', () => {
+    const away = fitStepCamera(position, target, REFERENCE_ASPECT, 1.2);
+    expect(away[0]).toBeCloseTo(120);
+    expect(away[1]).toBeCloseTo(110);
+    const narrow = fitStepCamera(position, target, REFERENCE_ASPECT / 2);
+    expect(narrow[0]).toBeCloseTo(200);
+    expect(narrow[1]).toBeCloseTo(150);
   });
 });
