@@ -2,6 +2,7 @@ import type { TechniqueDetail } from '@tatamap/shared';
 import { useState } from 'react';
 import { buttonClass } from '../../ui/button';
 import { TechniqueViewer } from '../viewer/TechniqueViewer';
+import { PUBLIC_SCENE } from '../viewer/theme';
 
 const SPEEDS = [0.5, 1, 2] as const;
 type Speed = (typeof SPEEDS)[number];
@@ -31,7 +32,8 @@ export function TechniqueView({ technique: data }: { technique: TechniqueDetail 
 
       <TechniqueViewer
         className="mt-4 aspect-video w-full overflow-hidden rounded-2xl border border-line"
-        background="#121f24"
+        background={PUBLIC_SCENE.background}
+        tatamiColor={PUBLIC_SCENE.tatami}
         steps={data.steps}
         stepIndex={stepIndex}
         playing={playing}

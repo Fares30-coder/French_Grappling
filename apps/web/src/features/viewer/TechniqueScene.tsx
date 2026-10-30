@@ -55,6 +55,9 @@ export type TechniqueSceneProps = {
   /** Editor: translucent "onion skin" pose (e.g. previous step). Not pickable. */
   ghostPose?: CurrentPose | null;
 
+  /** Mat color (default: the editor's light grey). */
+  tatamiColor?: string;
+
   /** Extra 3D content rendered inside the scene (TransformControls, camera capture...). */
   children?: ReactNode;
 };
@@ -80,6 +83,7 @@ export function TechniqueScene({
   onJointPointerDown,
   selectedJoint = null,
   ghostPose = null,
+  tatamiColor,
   children,
 }: TechniqueSceneProps) {
   const meRef = useRef<FighterMeshHandle>(null);
@@ -210,7 +214,7 @@ export function TechniqueScene({
       )}
       <ambientLight intensity={0.7} />
       <directionalLight position={[200, 400, 300]} intensity={1.6} />
-      <Tatami />
+      <Tatami {...(tatamiColor ? { color: tatamiColor } : {})} />
       <FighterMesh
         fighter="me"
         ref={meRef}
