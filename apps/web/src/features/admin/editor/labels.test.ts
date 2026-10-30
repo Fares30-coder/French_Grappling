@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { BONE_LABELS_FR, FIGHTER_LABELS_FR, formatWarning, JOINT_LABELS_FR } from './labels';
 
 describe('labels', () => {
-  it('name each of the 9 bones, once', () => {
+  it('name each of the 9 bones, once (plus the neck)', () => {
     expect(BONES_V1_11).toHaveLength(9);
     const labels = BONES_V1_11.map(([a, b]) => BONE_LABELS_FR[`${a}-${b}`]);
     for (const label of labels) expect(label).toBeTruthy();
     expect(new Set(labels).size).toBe(9);
-    expect(Object.keys(BONE_LABELS_FR)).toHaveLength(9);
+    expect(Object.keys(BONE_LABELS_FR)).toHaveLength(10); // 9 bones + neck-head
     expect(BONE_LABELS_FR['neck-hip']).toBe('buste');
     expect(BONE_LABELS_FR['kneeR-footR']).toBe('tibia droit');
   });

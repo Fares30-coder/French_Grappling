@@ -12,6 +12,7 @@ Documents de référence :
 - **Site web d'abord (PWA)**, pas d'app mobile native au départ : la 3D web (Three.js) est mature, ça colle au stack React/Node, pas de stores, l'éditeur de poses est plus confortable sur ordinateur.
 - **Différenciation** face au marché (Grapplearts, BJJ Fanatics, GrappleKit, BJJ OS, Your BJJ, Tatami…, presque tous en anglais) : le français, la 3D orientable, la carte des positions (graphe).
 - **Animations** : pas de vidéo générée par IA (rendu faux sur le grappling). Chaque technique = une suite de poses (articulations des 2 combattants), interpolées. Le contenu est créé via un **éditeur de poses admin**.
+- **Rendu 3D** (ADR 0004) : on garde Three.js / R3F. Évolution par étapes : corps humanoïdes glTF pilotés par les articulations (FighterMesh seulement), puis squelette `v2-21` via `upgradePose`. Changer de moteur ne réécrirait que le viewer et les enfants 3D de l'éditeur.
 - **Monétisation** (seulement après validation en club) : 1) abonnement clubs/profs (B2B, piste principale), 2) freemium pratiquants, 3) affiliation contextuelle (instructionals, kimonos), 4) sponsoring d'une catégorie. **Pas de pubs classiques / pop-ups** (peu rentable sur une niche, nuit à la 3D, au RGPD et au SEO). Éventuellement une seule bannière latérale desktop, à tester plus tard.
 - Encaissement via la micro-entreprise de Fares (Stripe).
 
@@ -34,7 +35,7 @@ Documents de référence :
 
 Structure prévue (monorepo) : `apps/web`, `apps/api`, `packages/shared`, `docker-compose.yml` (PostgreSQL local).
 
-Décisions détaillées : `docs/adr/` (0001 outillage, 0002 modèle de données et format de pose, 0003 admin, API d'écriture et éditeur). Plans : `docs/plan-phase-1.md`, `docs/plan-phase-2.md`.
+Décisions détaillées : `docs/adr/` (0001 outillage, 0002 modèle de données et format de pose, 0003 admin, API d'écriture et éditeur, 0004 évolution du rendu 3D). Plans : `docs/plan-phase-1.md`, `docs/plan-phase-2.md`.
 
 ## Modèle de données
 
@@ -51,7 +52,7 @@ Une technique est une **arête entre deux positions** (départ → arrivée, arr
 
 ### Format d'une pose (squelette `v1-11`)
 
-11 articulations par combattant, en (x, y, z), en cm, tatami à y = 0. Ordre : head, neck, hip, elbowL, handL, elbowR, handR, kneeL, footL, kneeR, footR. Combattants : `me` (le pratiquant qui exécute la technique, couleur #1D9E75 ; dessous au départ pour le ciseau) et `opponent` (#D85A30). `camera` optionnelle (angle conseillé par étape). Repère main droite, y vers le haut, 1 unité Three.js = 1 cm ; L/R = gauche/droite propres au combattant.
+11 articulations par combattant, en (x, y, z), en cm, tatami à y = 0. Ordre : head, neck, hip, elbowL, handL, elbowR, handR, kneeL, footL, kneeR, footR. Combattants : `me` (le pratiquant qui exécute la technique, couleur #1D9E75 ; dessous au départ pour le ciseau) et `opponent` (#D85A30). `camera` optionnelle (angle conseillé par étape). Repère main droite, y vers le haut, 1 unité Three.js = 1 cm ; L/R = gauche/droite propres au combattant (vérifié par `mirroredFighters` dans l'éditeur et `pose:check` ; les données du prototype ci-dessous ont `me` en miroir aux étapes 1 à 4). Longueurs d'os = corps standard symétrique (`STANDARD_BODY_V1_11` dans `@tatamap/shared`, ~1,75 m), le même pour les deux combattants, vérifié par l'éditeur et `pose:check`.
 
 ```json
 {
@@ -144,4 +145,5 @@ Le viewer 3D est **un seul composant réutilisé** (page technique, vignettes au
 
 - Code et commentaires en anglais, contenu du site en français.
 - TypeScript strict partout.
+- Frontière 3D : `three` / `@react-three/*` uniquement dans `features/viewer`, les enfants 3D de l'éditeur et `features/dev` (règle Biome `noRestrictedImports`). Une pose ne contient que des points en cm, rien de propre au moteur.
 - Le repo de code est **public** (portfolio). Le contenu (positions, tags, techniques) est exporté dans `content/` par `pnpm content:export` et réimporté par `pnpm content:import` (sauvegarde et passage en prod). `content/` est un clone du repo **privé** `Fares30-coder/tatamap-content`, ignoré par ce repo : ne jamais commiter de contenu ici.

@@ -45,7 +45,7 @@ describe('boneLengths', () => {
   it('gives the 9 bones of the starter pose', () => {
     const lengths = boneLengths(STARTER_POSE.fighters.me);
     expect(Object.keys(lengths)).toHaveLength(9);
-    expect(lengths['neck-hip']).toBe(45);
+    expect(lengths['neck-hip']).toBe(50);
   });
 });
 
@@ -80,6 +80,6 @@ describe('STARTER_POSE', () => {
   });
   it('faces the opponent with correct left/right', () => {
     expect(STARTER_POSE.fighters.opponent.handL[2]).toBe(0 - STARTER_POSE.fighters.me.handL[2]);
-    expect(STARTER_POSE.fighters.opponent.head).toEqual([50, 160, 0]);
+    expect(STARTER_POSE.fighters.opponent.head).toEqual([50, 165, 0]);
   });
 });

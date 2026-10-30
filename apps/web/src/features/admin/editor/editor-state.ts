@@ -6,11 +6,12 @@ import {
   DEFAULT_TRANSITION_MS,
   type FighterId,
   type JointV1_11,
+  mirroredFighters,
   mirrorPose,
-  type PoseWarning,
-  poseWarnings,
   publishIssues,
+  type StandardBodyWarning,
   type StepInput,
+  standardBodyWarnings,
   type TechniqueUpdateInput,
   type Vec3,
 } from '@tatamap/shared';
@@ -395,12 +396,16 @@ export function toUpdateInput(state: EditorState): TechniqueUpdateInput {
   };
 }
 
-/** Bone-length warnings of the current step against step 1 (none on step 1 itself). */
-export function currentWarnings(state: EditorState): PoseWarning[] {
-  const reference = state.technique.steps[0];
+/** Bone-length warnings of the current step against the standard body (ADR 0002 addendum). */
+export function currentWarnings(state: EditorState): StandardBodyWarning[] {
   const current = state.technique.steps[state.stepIndex];
-  if (!reference || !current || state.stepIndex === 0) return [];
-  return poseWarnings(current.pose, reference.pose);
+  return current ? standardBodyWarnings(current.pose) : [];
+}
+
+/** Fighters of the current step whose L/R labels look swapped (mirror image of a real body). */
+export function currentMirrored(state: EditorState): FighterId[] {
+  const current = state.technique.steps[state.stepIndex];
+  return current ? mirroredFighters(current.pose) : [];
 }
 
 export const currentPublishIssues = (state: EditorState): string[] =>

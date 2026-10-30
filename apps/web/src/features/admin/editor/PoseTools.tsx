@@ -1,5 +1,5 @@
-import type { PoseWarning } from '@tatamap/shared';
-import { formatWarning } from './labels';
+import type { FighterId, StandardBodyWarning } from '@tatamap/shared';
+import { FIGHTER_LABELS_FR, formatWarning } from './labels';
 
 type Props = {
   canUndo: boolean;
@@ -13,12 +13,13 @@ type Props = {
   onMirror: (scope: 'step' | 'all') => void;
   playing: boolean;
   onTogglePlay: () => void;
-  warnings: ReadonlyArray<PoseWarning>;
+  warnings: ReadonlyArray<StandardBodyWarning>;
+  mirrored: ReadonlyArray<FighterId>;
 };
 
 const button = 'rounded border border-slate-300 px-3 py-1 text-sm disabled:opacity-50';
 
-/** Editing aids: undo/redo, onion skin, copy, mirror, playback of the unsaved steps, bone warnings. */
+/** Editing aids: undo/redo, onion skin, copy, mirror, playback of the unsaved steps, bone and handedness warnings. */
 export function PoseTools({
   canUndo,
   canRedo,
@@ -32,6 +33,7 @@ export function PoseTools({
   playing,
   onTogglePlay,
   warnings,
+  mirrored,
 }: Props) {
   return (
     <section aria-label="Aides à la saisie" className="space-y-3">
@@ -63,12 +65,23 @@ export function PoseTools({
       </div>
       {warnings.length > 0 && (
         <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          <p className="font-medium">Longueurs d'os inhabituelles (par rapport à l'étape 1)</p>
+          <p className="font-medium">
+            Longueurs d'os inhabituelles (par rapport au corps standard)
+          </p>
           <ul className="mt-1 list-disc pl-5">
             {warnings.map((w) => (
               <li key={`${w.fighter}-${w.bone}`}>{formatWarning(w)}</li>
             ))}
           </ul>
+        </div>
+      )}
+      {mirrored.length > 0 && (
+        <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <p className="font-medium">Gauche et droite inversées</p>
+          <p className="mt-1">
+            {mirrored.map((f) => FIGHTER_LABELS_FR[f]).join(' et ')} : les articulations « gauche »
+            sont du côté droit du corps (image miroir). Invisible ici, faux sur un corps réaliste.
+          </p>
         </div>
       )}
     </section>
