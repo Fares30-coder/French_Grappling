@@ -199,3 +199,14 @@ Dans « Conventions » :
 ## Addendum (2026-11-02) : interpolation par os
 
 Entre deux étapes, `interpolatePose` ne déplace plus chaque articulation en ligne droite : la hanche va en ligne droite, puis chaque os (`BONE_CHAIN_V1_11`, de la hanche vers les extrémités) tourne sur un grand cercle et sa longueur varie linéairement. En ligne droite, un bras qui pivote raccourcissait jusqu'à 38 cm au milieu de la transition ; les membres gardent maintenant leur longueur. Le format de pose ne change pas (toujours des points en cm, F2). Les points ajoutés par `v2-21` devront avoir un parent dans la chaîne. Les scripts Blender (`tatamap_humanoid.py`, `transitions.py`) font le même calcul.
+
+## Addendum (2026-11-03) : étape 1 lancée, avec le mannequin des vidéos
+
+Fares a lancé l'étape 1 avant les critères (le mannequin Blender des vidéos était prêt et jugé bien plus lisible que les bâtons). Ce qui diffère du plan ci-dessus :
+
+- **Source du modèle** (action 3) : le mannequin fait sur mesure dans Blender (`tools/blender/tatamap_humanoid.py`), exporté par `tools/blender/export_site_model.py` en `apps/web/public/models/fighter.v1.glb`. C'est notre œuvre : pas de question de licence.
+- **Rig** : 55 os indépendants (sans hiérarchie) au lieu de 14, comme dans Blender : bassin, abdomen, poitrine, cou, tête, et par côté clavicule, deltoïde, bras (et son os de torsion), avant-bras, main, cuisse (et son os de torsion), tibia, pied, trois phalanges par doigt et pour le pouce. Les repères de repos de chaque os sont dans les extras de la scène glTF (`tatamapRest`).
+- **Pilotage** : `features/viewer/rig.ts` est le portage de `derived_points` / `bone_frames` (épaules en omoplate, hanches, sens du buste par les cuisses, torsion vers le coude et le genou, mains selon `hands` ou automatiques). `rig.test.ts` le compare à des repères calculés par Blender (`tools/blender/rig_fixture.py`, sur les poses publiques du ciseau) : le site et les vidéos posent le modèle de la même façon. Chaque os est placé par `repère(maintenant) × repère(repos)⁻¹`, comme dans Blender ; les conventions d'axes de l'export glTF s'annulent. Les os sont étirés à la longueur saisie (pas d'échelle globale) : les extrémités tombent exactement sur les points.
+- **Peau** : skinning linéaire (three) au lieu des quaternions doubles de Blender ; les os de torsion et du deltoïde limitent l'écrasement.
+- **Taille** : 873 Ko non compressé (15 200 sommets), sous le budget de 1,5 Mo ; la compression meshopt (`gltfpack -cc -kn -ke`, garder noms et extras) reste à faire. Précaché par la PWA (`**/*.glb`).
+- **Repli** : bâtons pendant le chargement, si le modèle échoue (`BodyErrorBoundary`), et pour le fantôme de l'éditeur. Dans l'éditeur, le corps est translucide et les sphères restent cliquables par-dessus.

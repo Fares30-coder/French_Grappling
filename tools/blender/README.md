@@ -58,6 +58,22 @@ build_humanoids()                    # hides the stick mannequins from renders
 bake_humanoids('content/techniques/<slug>.json')  # every frame, the site's timing
 ```
 
+## Site model
+
+The site's viewer shows the same mannequin (ADR 0004, addendum 2026-11-03):
+
+```sh
+blender -b --factory-startup -P tools/blender/export_site_model.py -- apps/web/public/models/fighter.v1.glb
+blender -b --factory-startup -P tools/blender/rig_fixture.py -- poses.json apps/web/src/features/viewer/rig.fixture.json
+```
+
+The first exports one white body (tinted by the viewer) at rest, with each bone's rest frame in
+the scene extras. Bump `MODEL_VERSION` and the file name when the model changes, so the PWA cache
+moves on. The second writes the reference bone frames `rig.test.ts` checks the site's port of
+`bone_frames` against (`apps/web/src/features/viewer/rig.ts`): rerun it after any change to the
+derived points, rolls or hands here, and port the change. `poses.json` must hold public poses only
+(the fixture is committed): the scissor sweep seed poses, `{"poses": [...]}`.
+
 ## Transitions check
 
 `python3 tools/blender/transitions.py content/techniques/<slug>.json` lists the limbs that pass
