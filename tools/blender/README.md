@@ -32,3 +32,21 @@ or leave those steps untouched.
 Axes: Tatamap is centimetres with y up; Blender is metres with z up. The mapping
 `(x, y, z) -> (x, -z, y) / 100` is a rotation, so left stays left. A round trip
 (load then export, nothing moved) changes no joint by more than 0.3 cm.
+
+## Humanoid mannequins (videos)
+
+`tatamap_humanoid.py` (run after `tatamap_rig.py`) builds one organic body per fighter: a stick
+figure turned into a smooth mesh by the Skin and Subdivision modifiers (pelvis, waist, chest,
+shoulders, upper arms, forearms, hands, neck, head, thighs, calves, feet), auto-weighted to an
+armature that follows the 11 joints. Shoulders, hip joints, hands, feet and the torso's facing are
+derived from the joints (forward = the thighs' direction across the spine).
+
+```python
+build_humanoids()                    # hides the stick mannequins from renders
+bake_humanoids('content/techniques/<slug>.json')  # every frame, the site's timing
+```
+
+## Transitions check
+
+`python3 tools/blender/transitions.py content/techniques/<slug>.json` lists the limbs that pass
+through each other while the site interpolates between two steps (exit code 1 if any).
