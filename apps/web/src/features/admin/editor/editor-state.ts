@@ -5,6 +5,8 @@ import {
   clampVec3,
   DEFAULT_TRANSITION_MS,
   type FighterId,
+  type HandSide,
+  type HandState,
   type JointV1_11,
   mirroredFighters,
   mirrorPose,
@@ -14,6 +16,7 @@ import {
   standardBodyWarnings,
   type TechniqueUpdateInput,
   type Vec3,
+  withHandState,
 } from '@tatamap/shared';
 
 /** The editable content of a technique (no id, status, dates, nor version: see EditorState). */
@@ -80,6 +83,7 @@ export type EditorAction =
   | { type: 'copyPreviousPose' }
   | { type: 'mirror'; scope: 'step' | 'all' }
   | { type: 'setStepCamera'; camera: CameraHint | undefined }
+  | { type: 'setHand'; fighter: FighterId; side: HandSide; state: HandState | undefined }
   | { type: 'selectJoint'; joint: JointRef | null }
   | { type: 'undo' }
   | { type: 'redo' }
@@ -330,6 +334,15 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         null,
       );
     }
+
+    case 'setHand':
+      return commit(
+        state,
+        withStep(technique, state.stepIndex, (s) =>
+          withPose(s, withHandState(s.pose, action.fighter, action.side, action.state)),
+        ),
+        null,
+      );
 
     case 'selectJoint':
       return breakRun({ selectedJoint: action.joint });

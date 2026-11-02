@@ -596,3 +596,14 @@ Dans « Format d'une pose », remplacer « `me` (dessous au départ, couleur #1D
 - Des proportions constantes rendent les techniques comparables entre elles et préparent le rendu par corps humanoïdes (ADR 0004), qui a besoin de longueurs stables.
 
 **Portée.** Aucun changement du schéma ni du format stocké (`v1-11` reste gelé, ADR 0002 D6) : c'est une règle de contenu, vérifiée en avertissement, jamais bloquante. Les poses de `content/` sont à refaire avec le corps standard ; le seed du ciseau garde ses poses prototype (fixture de tests uniquement).
+
+## Addendum (2026-11-02) : état des mains
+
+**Décision.** Une pose peut dire ce que fait chaque main, ce que les positions seules ne disent pas : `hands`, optionnel, `{ me?: { L?, R? }, opponent?: { L?, R? } }`, chaque main valant `grip` (tient : poing fermé sur un col, une manche, un poignet), `push` (pousse ou se pose : main à plat) ou `free` (libre, détendue). Une main absente est « auto » : le rendu décide (aujourd'hui, les mannequins Blender se ferment près du corps de l'adversaire). Schéma `handsSchema`, libellés `HAND_STATE_LABELS_FR`, helpers `handState` et `withHandState` dans `@tatamap/shared` ; `mirrorPose` échange L et R ; l'éditeur propose « Auto / Tient / Pousse / Libre » quand une main est sélectionnée.
+
+**Raisons.**
+- Les mannequins humanoïdes (ADR 0004) ferment la main dès qu'elle touche l'adversaire : une main posée pour pousser une hanche devenait un poing.
+- C'est une information de technique (tenir la manche, pousser la hanche), pas un détail de rendu : elle a sa place dans la pose, au même titre que la caméra conseillée.
+- Par étape, comme les articulations : une main peut tenir à l'étape 3 et lâcher à l'étape 4.
+
+**Portée.** Ajout optionnel qui laisse valides tous les documents existants : permis dans `v1-11` (D6, point 2), pas de nouvelle version ni de migration. Le viewer du site l'ignore pour l'instant (sphères, pas de mains). Le site n'étant pas encore déployé, aucun client en cache ne peut recevoir un champ qu'il ne connaît pas.

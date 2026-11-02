@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { BONE_LENGTH_TOLERANCE, boneLengths, clampVec3, mirrorPose, poseWarnings } from './edit';
+import {
+  BONE_LENGTH_TOLERANCE,
+  boneLengths,
+  clampVec3,
+  handState,
+  mirrorPose,
+  poseWarnings,
+  withHandState,
+} from './edit';
 import { deepClone, validPose } from './fixtures';
 import { currentPoseSchema } from './pose';
 import { STARTER_POSE } from './starter-pose';
@@ -30,6 +38,41 @@ describe('mirrorPose', () => {
 
   it('gives a pose that still passes the schema', () => {
     expect(currentPoseSchema.safeParse(mirrorPose(validPose)).success).toBe(true);
+  });
+
+  it('swaps the hand states of each fighter', () => {
+    const pose = {
+      ...validPose,
+      hands: { me: { L: 'grip' as const }, opponent: { R: 'push' as const } },
+    };
+    expect(mirrorPose(pose).hands).toEqual({ me: { R: 'grip' }, opponent: { L: 'push' } });
+    expect(mirrorPose(mirrorPose(pose))).toEqual(pose);
+    expect('hands' in mirrorPose(validPose)).toBe(false);
+  });
+});
+
+describe('withHandState', () => {
+  it('sets, reads and clears a hand, dropping empty objects', () => {
+    const gripped = withHandState(validPose, 'me', 'L', 'grip');
+    expect(handState(gripped, 'me', 'L')).toBe('grip');
+    expect(handState(gripped, 'me', 'R')).toBeUndefined();
+    const both = withHandState(gripped, 'opponent', 'R', 'push');
+    expect(both.hands).toEqual({ me: { L: 'grip' }, opponent: { R: 'push' } });
+    const cleared = withHandState(
+      withHandState(both, 'me', 'L', undefined),
+      'opponent',
+      'R',
+      undefined,
+    );
+    expect('hands' in cleared).toBe(false);
+    expect(cleared).toEqual(validPose);
+  });
+
+  it('does not mutate its input', () => {
+    const pose = withHandState(validPose, 'me', 'L', 'grip');
+    const copy = deepClone(pose);
+    withHandState(pose, 'me', 'L', 'push');
+    expect(pose).toEqual(copy);
   });
 });
 
