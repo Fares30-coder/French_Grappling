@@ -343,31 +343,39 @@ PALM = [(-2.0, 0.0, 0.0, 1.4, 2.2), (-0.8, 0.0, 0.0, 1.55, 2.6), (2.5, 0.15, 0.2
 # Closed hand (a grip): curl at each finger knuckle, and the thumb wrapped over the fingers.
 FIST_CURL = (78, 95, 55)
 THUMB_FIST = [(0.9, 1.6, 1.6), (2.6, 3.8, 2.4), (4.0, 5.6, 1.2), (4.6, 7.2, -0.6)]
+# Flat hand (pushing, posted): fingers nearly straight, thumb spread in the palm's plane.
+FLAT_CURL = (4, 6, 4)
+THUMB_FLAT = [(0.9, 1.6, 1.6), (1.1, 3.8, 3.7), (1.2, 5.8, 5.1), (1.2, 7.6, 5.9)]
+# Hand shape: -1 flat, 0 relaxed, 1 fist. Pose `hands` values; a hand left out is auto.
+HAND_SHAPES = {'push': -1.0, 'free': 0.0, 'grip': 1.0}
 
 
-def _finger_points(grip):
-    """Local points (palm side x, along y, thumb side z) of the four fingers and the thumb, from
-    relaxed (grip 0) to a closed fist (grip 1). Each finger: inside the palm, knuckle, 3 joints."""
+def _finger_points(shape):
+    """Local points (palm side x, along y, thumb side z) of the four fingers and the thumb, for a
+    hand shape from -1 (flat) through 0 (relaxed) to 1 (fist). Each finger: inside the palm,
+    knuckle, 3 joints."""
+    curl_to, thumb_to = (FIST_CURL, THUMB_FIST) if shape >= 0 else (FLAT_CURL, THUMB_FLAT)
+    amount = abs(shape)
     palm_side = Vector((1, 0, 0))
     fingers = []
     for across, length, spread, _r in FINGERS:
         d = _rotate(Vector((0, 1, 0)), palm_side, -spread)
         pt = Vector((0, 9.2, across))
         pts = [Vector((0, 7.0, across)), pt]
-        for frac, relaxed, fist in zip(PHALANX, FINGER_CURL, FIST_CURL):
-            d = _rotate(d, d.cross(palm_side).normalized(), relaxed + (fist - relaxed) * grip)
+        for frac, relaxed, end in zip(PHALANX, FINGER_CURL, curl_to):
+            d = _rotate(d, d.cross(palm_side).normalized(), relaxed + (end - relaxed) * amount)
             pt = pt + d * (length * frac)
             pts.append(pt)
         fingers.append(pts)
-    thumb = [Vector(p).lerp(Vector(f), grip) for (p, _r), f in zip(THUMB, THUMB_FIST)]
+    thumb = [Vector(p).lerp(Vector(f), amount) for (p, _r), f in zip(THUMB, thumb_to)]
     return fingers, thumb
 
 
-def _hand_bones(head, tail, z, s, sign, grip):
+def _hand_bones(head, tail, z, s, sign, shape):
     """Finger and thumb bones (head, tail, z) in Tatamap cm, for a hand bone head -> tail."""
     axes = _axes(head, tail, z)
     at = _local(head, axes, sign)
-    fingers, thumb = _finger_points(grip)
+    fingers, thumb = _finger_points(shape)
     bones = {}
     for i, pts in enumerate(fingers):
         for k in range(3):
@@ -537,7 +545,7 @@ def build_humanoids():
 
 
 GRIP_CM = (3, 10)  # hand point to the opponent's surface: closed below, relaxed above
-GRIP_SPEED = 0.12  # most the grip changes per frame (about a quarter of a second to close)
+GRIP_SPEED = 0.12  # most the hand shape changes per frame (about a quarter of a second to close)
 # The opponent's volume, as capsules: (joint, joint, radius cm).
 BODY_CAPSULES = [('hip', 'neck', 14), ('neck', 'head', 6), ('head', 'head', 12)] + [
     c for s in 'LR' for c in (('neck', 'elbow' + s, 5), ('elbow' + s, 'hand' + s, 4),
@@ -561,10 +569,11 @@ def grip_amount(f, s, other=None):
     return _smoothstep(min(1.0, max(0.0, (hi - gap) / (hi - lo))))
 
 
-def bone_frames(f, prev=None, other=None):
+def bone_frames(f, prev=None, other=None, hands=None):
     """Each bone's (head, tail, z axis) in Tatamap cm for a v1-11 fighter, and the state to
     pass as `prev` for the next frame: rolls then turn at most MAX_TURN_DEG per frame, and
-    grips change at most GRIP_SPEED per frame."""
+    hand shapes change at most GRIP_SPEED per frame. `hands`: the fighter's entry of the pose's
+    `hands` ({'L': 'grip' | 'push' | 'free'}); a hand left out closes on `other` (auto)."""
     q, refs = derived_points(f, prev['fwd'] if prev else None)
     bones = {}
     for name, (h, t, ref) in HBONES.items():
@@ -577,21 +586,22 @@ def bone_frames(f, prev=None, other=None):
                 limit = math.radians(MAX_TURN_DEG)
                 z = Matrix.Rotation(max(-limit, min(limit, angle)), 3, y) @ before
         bones[name] = (q[h], q[t], z)
-    state = {'fwd': refs['fwd'], 'z': {n: b[2] for n, b in bones.items()}, 'grip': {}}
+    state = {'fwd': refs['fwd'], 'z': {n: b[2] for n, b in bones.items()}, 'hand': {}}
     for s, sign in (('L', 1), ('R', -1)):
-        grip = grip_amount(f, s, other)
+        wanted = (hands or {}).get(s)
+        shape = HAND_SHAPES[wanted] if wanted in HAND_SHAPES else grip_amount(f, s, other)
         if prev:
-            before = prev['grip'][s]
-            grip = before + max(-GRIP_SPEED, min(GRIP_SPEED, grip - before))
-        state['grip'][s] = grip
-        bones.update(_hand_bones(*bones['hand.' + s], s, sign, grip))
+            before = prev['hand'][s]
+            shape = before + max(-GRIP_SPEED, min(GRIP_SPEED, shape - before))
+        state['hand'][s] = shape
+        bones.update(_hand_bones(*bones['hand.' + s], s, sign, shape))
     return bones, state
 
 
-def pose_humanoid(rig, f, prev=None, other=None):
-    """Poses a humanoid rig on a v1-11 fighter (`other`: the opponent's joints, for grips);
-    returns the state for the next frame."""
-    bones, state = bone_frames(f, prev, other)
+def pose_humanoid(rig, f, prev=None, other=None, hands=None):
+    """Poses a humanoid rig on a v1-11 fighter (`other`: the opponent's joints, for automatic
+    grips; `hands`: its hand states); returns the state for the next frame."""
+    bones, state = bone_frames(f, prev, other, hands)
     inv = rig.matrix_world.inverted()
     origin = to_bl((0, 0, 0))
     for name, (head, tail, z) in bones.items():
@@ -626,11 +636,26 @@ def site_timeline(technique):
     return frames
 
 
+def site_hands(technique):
+    """The pose's `hands` for every frame of site_timeline: a step's own while it is held, the
+    next step's during the transition towards it (the shape then changes progressively)."""
+    steps = technique['steps']
+    hold = round(HOLD_MS / 1000 * FPS)
+    frames = []
+    for i, step in enumerate(steps):
+        frames += [step['pose'].get('hands', {})] * hold
+        if i + 1 < len(steps):
+            n = max(1, round(steps[i + 1]['transitionMs'] / 1000 * FPS))
+            frames += [steps[i + 1]['pose'].get('hands', {})] * n
+    return frames
+
+
 def bake_humanoids(technique_path, start_frame=1):
     """Keys the humanoids on every frame of the technique, with the site's timing."""
     with open(technique_path, encoding='utf-8') as fh:
         technique = json.load(fh)
     frames = site_timeline(technique)
+    hands = site_hands(technique)
     rigs = {fid: bpy.data.objects[fid + HUMANOID_SUFFIX] for fid in FIGHTERS}
     for rig in rigs.values():
         rig.animation_data_clear()
@@ -641,7 +666,7 @@ def bake_humanoids(technique_path, start_frame=1):
         frame = start_frame + k
         for fid, rig in rigs.items():
             other = poses['opponent' if fid == 'me' else 'me']
-            prev[fid] = pose_humanoid(rig, poses[fid], prev[fid], other)
+            prev[fid] = pose_humanoid(rig, poses[fid], prev[fid], other, hands[k].get(fid))
             bpy.context.view_layer.update()
             for pb in rig.pose.bones:
                 pb.keyframe_insert('location', frame=frame)
