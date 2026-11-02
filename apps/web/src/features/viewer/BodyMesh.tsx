@@ -131,7 +131,8 @@ function buildBody(scene: Object3D, rest: Rest, color: string, translucent: bool
     bone.matrixAutoUpdate = false;
   });
   const missing = Object.keys(rest).filter((name) => !driven.has(nodeName(name)));
-  if (missing.length > 0) throw new Error(`${BODY_MODEL_URL}: bones not found: ${missing.join(', ')}`);
+  if (missing.length > 0)
+    throw new Error(`${BODY_MODEL_URL}: bones not found: ${missing.join(', ')}`);
   return { root, driven, material };
 }
 
