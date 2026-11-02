@@ -2,8 +2,8 @@
 
     python3 tools/blender/transitions.py content/techniques/<slug>.json [--from 9 --to 13]
 
-The viewer interpolates each joint linearly (with a smoothstep in time, which does not change the
-path). Two segments that come within THRESHOLD cm of each other mid-transition while they are
+The viewer moves the hip linearly and turns each bone along a great circle (with a smoothstep in
+time, which does not change the path); interpolate_fighter below does the same. Two segments that come within THRESHOLD cm of each other mid-transition while they are
 clearly apart at both ends are reported: they cross, or brush through each other, on screen.
 Pure Python (no Blender, no numpy).
 """
@@ -58,8 +58,47 @@ def seg_dist(p1, q1, p2, q2):
     return math.dist(pa, pb)
 
 
-def lerp_fighter(a, b, t):
-    return {j: [a[j][i] + (b[j][i] - a[j][i]) * t for i in range(3)] for j in a}
+# Same as apps/web/src/features/viewer/interpolate.ts: the hip moves in a straight line, each
+# bone turns along a great circle and changes length linearly, so limbs keep their length.
+BONE_CHAIN = [
+    ('hip', 'neck'), ('neck', 'head'),
+    ('neck', 'elbowL'), ('elbowL', 'handL'), ('neck', 'elbowR'), ('elbowR', 'handR'),
+    ('hip', 'kneeL'), ('kneeL', 'footL'), ('hip', 'kneeR'), ('kneeR', 'footR'),
+]
+
+
+def _slerp_unit(a, b, t, eps=1e-6):
+    angle = math.acos(max(-1.0, min(1.0, sum(x * y for x, y in zip(a, b)))))
+    if angle < eps:
+        return a
+    if angle > math.pi - eps:
+        # Opposite directions: turn through a fixed perpendicular (as the viewer does).
+        helper = (0, 1, 0) if abs(a[1]) < 0.9 else (1, 0, 0)
+        axis = (a[1] * helper[2] - a[2] * helper[1], a[2] * helper[0] - a[0] * helper[2],
+                a[0] * helper[1] - a[1] * helper[0])
+        n = math.hypot(*axis)
+        perp = [(axis[1] * a[2] - axis[2] * a[1]) / n, (axis[2] * a[0] - axis[0] * a[2]) / n,
+                (axis[0] * a[1] - axis[1] * a[0]) / n]
+        c, s = math.cos(math.pi * t), math.sin(math.pi * t)
+        return [a[i] * c + perp[i] * s for i in range(3)]
+    s = math.sin(angle)
+    ka, kb = math.sin((1 - t) * angle) / s, math.sin(t * angle) / s
+    return [a[i] * ka + b[i] * kb for i in range(3)]
+
+
+def interpolate_fighter(a, b, t):
+    out = {'hip': [a['hip'][i] + (b['hip'][i] - a['hip'][i]) * t for i in range(3)]}
+    for parent, child in BONE_CHAIN:
+        da = [a[child][i] - a[parent][i] for i in range(3)]
+        db = [b[child][i] - b[parent][i] for i in range(3)]
+        la, lb = math.hypot(*da), math.hypot(*db)
+        if la == 0 or lb == 0:
+            off = [da[i] + (db[i] - da[i]) * t for i in range(3)]
+        else:
+            u = _slerp_unit([x / la for x in da], [x / lb for x in db], t)
+            off = [x * (la + (lb - la) * t) for x in u]
+        out[child] = [out[parent][i] + off[i] for i in range(3)]
+    return out
 
 
 def shares_joint(s1, s2):
@@ -83,8 +122,8 @@ def check_transition(step_a, step_b):
         series = []
         for n in range(SAMPLES + 1):
             t = n / SAMPLES
-            g1 = lerp_fighter(fa[f1], fb[f1], t)
-            g2 = lerp_fighter(fa[f2], fb[f2], t)
+            g1 = interpolate_fighter(fa[f1], fb[f1], t)
+            g2 = interpolate_fighter(fa[f2], fb[f2], t)
             series.append(seg_dist(g1[s1[0]], g1[s1[1]], g2[s2[0]], g2[s2[1]]))
         low = min(series)
         ends = min(series[0], series[-1])
