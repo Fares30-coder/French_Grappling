@@ -37,9 +37,12 @@ Axes: Tatamap is centimetres with y up; Blender is metres with z up. The mapping
 
 `tatamap_humanoid.py` (run after `tatamap_rig.py`) builds one organic body per fighter: a stick
 figure turned into a smooth mesh by the Skin and Subdivision modifiers (pelvis, waist, chest,
-shoulders, upper arms, forearms, hands, neck, head, thighs, calves, feet), auto-weighted to an
-armature that follows the 11 joints. Shoulders, hip joints, hands, feet and the torso's facing are
-derived from the joints (forward = the thighs' direction across the spine).
+shoulders, arms, neck, thighs, calves), a head, and rigid hands (palm, four curled fingers,
+thumb) and feet (heel, arch, five toes), on an armature that follows the 11 joints. Shoulders
+(which follow the arm a little, like a shoulder blade), hip joints, the torso's facing
+(forward = the thighs' direction across the spine) and the limbs' twist (towards the elbow and
+knee points) are derived from the joints. Body weights are computed from each vertex's distance
+to the bones, scaled by the part's radius, so a bent thigh or arm does not drag the torso.
 
 ```python
 build_humanoids()                    # hides the stick mannequins from renders
