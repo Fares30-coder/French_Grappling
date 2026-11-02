@@ -13,3 +13,6 @@ coverage
 
 # Screenshots produced by pnpm pose:render
 /.pose-renders/
+
+# Python
+__pycache__/
