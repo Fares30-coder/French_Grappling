@@ -2,6 +2,7 @@ import { STARTER_POSE } from '@tatamap/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { EditorTechnique } from './editor-state';
+import { JointPanel } from './JointPanel';
 import { MetaForm } from './MetaForm';
 import { StepsPanel } from './StepsPanel';
 
@@ -58,5 +59,34 @@ describe('editor panels (static render)', () => {
       />,
     );
     expect(single).toContain('aria-label="Supprimer l&#x27;étape 1" disabled=""');
+  });
+
+  it('JointPanel: offers the hand states for a selected hand only, the current one pressed', () => {
+    const props = {
+      position: [0, 50, 0] as const,
+      onSelect: () => undefined,
+      onMove: () => undefined,
+    };
+    const hand = renderToStaticMarkup(
+      <JointPanel
+        {...props}
+        position={[0, 50, 0]}
+        selected={{ fighter: 'me', joint: 'handR' }}
+        handState="push"
+        onHandState={() => undefined}
+      />,
+    );
+    expect(hand).toContain('Main à cette étape');
+    expect(hand).toMatch(/aria-pressed="true"[^>]*>Pousse</);
+    expect(hand).toMatch(/aria-pressed="false"[^>]*>Auto</);
+    const knee = renderToStaticMarkup(
+      <JointPanel
+        {...props}
+        position={[0, 50, 0]}
+        selected={{ fighter: 'me', joint: 'kneeL' }}
+        onHandState={() => undefined}
+      />,
+    );
+    expect(knee).not.toContain('Main à cette étape');
   });
 });

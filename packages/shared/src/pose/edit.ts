@@ -5,6 +5,9 @@ import {
   FIGHTERS,
   type FighterId,
   type FighterPoseV1_11,
+  type HandSide,
+  type HandState,
+  type Hands,
   type JointV1_11,
   POSE_BOUNDS_CM,
   type Vec3,
@@ -59,7 +62,47 @@ export function mirrorPose(pose: CurrentPose): CurrentPose {
       opponent: mirrorFighter(pose.fighters.opponent),
     },
     ...(camera ? { camera } : {}),
+    ...(pose.hands ? { hands: mirrorHands(pose.hands) } : {}),
   };
+}
+
+function mirrorHands(hands: Hands): Hands {
+  const mirrored: Hands = {};
+  for (const fighter of FIGHTERS) {
+    const own = hands[fighter];
+    if (!own) continue;
+    mirrored[fighter] = {
+      ...(own.R ? { L: own.R } : {}),
+      ...(own.L ? { R: own.L } : {}),
+    };
+  }
+  return mirrored;
+}
+
+/** State of one hand, or undefined when it is left to the renderer ("auto"). */
+export function handState(
+  pose: CurrentPose,
+  fighter: FighterId,
+  side: HandSide,
+): HandState | undefined {
+  return pose.hands?.[fighter]?.[side];
+}
+
+/** Sets (or, with undefined, clears) a hand state; drops objects left empty. Pure. */
+export function withHandState(
+  pose: CurrentPose,
+  fighter: FighterId,
+  side: HandSide,
+  state: HandState | undefined,
+): CurrentPose {
+  const hands: Hands = { ...pose.hands };
+  const own = { ...hands[fighter] };
+  if (state) own[side] = state;
+  else delete own[side];
+  if (Object.keys(own).length) hands[fighter] = own;
+  else delete hands[fighter];
+  const { hands: _old, ...rest } = pose;
+  return Object.keys(hands).length ? { ...rest, hands } : rest;
 }
 
 const clamp = (value: number, min: number, max: number): number =>

@@ -1,4 +1,12 @@
-import { FIGHTERS, type FighterId, JOINTS_V1_11, type Vec3 } from '@tatamap/shared';
+import {
+  FIGHTERS,
+  type FighterId,
+  HAND_STATE_LABELS_FR,
+  HAND_STATES,
+  type HandState,
+  JOINTS_V1_11,
+  type Vec3,
+} from '@tatamap/shared';
 import type { JointRef } from './editor-state';
 import { FIGHTER_LABELS_FR, JOINT_LABELS_FR } from './labels';
 
@@ -8,7 +16,15 @@ type Props = {
   position: Vec3 | null;
   onSelect: (joint: JointRef) => void;
   onMove: (position: Vec3) => void;
+  /** What the selected hand does in the current step (undefined: auto). */
+  handState?: HandState | undefined;
+  onHandState?: (state: HandState | undefined) => void;
 };
+
+const HAND_CHOICES: ReadonlyArray<readonly [HandState | undefined, string]> = [
+  [undefined, 'Auto'],
+  ...HAND_STATES.map((state) => [state, HAND_STATE_LABELS_FR[state]] as const),
+];
 
 const AXES = ['x', 'y', 'z'] as const;
 const FIGHTER_COLOR: Record<FighterId, string> = {
@@ -17,7 +33,15 @@ const FIGHTER_COLOR: Record<FighterId, string> = {
 };
 
 /** Joint buttons (when spheres overlap in the 3D view) and the numeric x / y / z of the selection. */
-export function JointPanel({ selected, position, onSelect, onMove }: Props) {
+export function JointPanel({
+  selected,
+  position,
+  onSelect,
+  onMove,
+  handState,
+  onHandState,
+}: Props) {
+  const isHand = selected?.joint === 'handL' || selected?.joint === 'handR';
   const setAxis = (axis: number, value: number) => {
     if (!position || !Number.isFinite(value)) return;
     const next: Vec3 = [position[0], position[1], position[2]];
@@ -80,6 +104,30 @@ export function JointPanel({ selected, position, onSelect, onMove }: Props) {
           <p className="mt-1 text-xs text-slate-600">
             Flèches : ±1 cm, Maj + flèches : ±10 cm. Échap : désélectionner.
           </p>
+          {isHand && onHandState ? (
+            <fieldset className="mt-3">
+              <legend className="text-sm font-medium">Main à cette étape</legend>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {HAND_CHOICES.map(([state, label]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    aria-pressed={handState === state}
+                    className={`rounded border border-slate-300 px-2 py-1 text-xs ${
+                      handState === state ? 'bg-slate-800 text-white' : 'bg-white'
+                    }`}
+                    onClick={() => onHandState(state)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1 text-xs text-slate-600">
+                Tient : poing fermé (col, manche, poignet). Pousse : main à plat. Auto : fermée si
+                elle touche l'adversaire.
+              </p>
+            </fieldset>
+          ) : null}
         </div>
       ) : (
         <p className="text-sm text-slate-600">

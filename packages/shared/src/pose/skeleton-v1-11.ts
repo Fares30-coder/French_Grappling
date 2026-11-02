@@ -76,6 +76,33 @@ export const cameraSchema = z.strictObject({
 });
 export type CameraHint = z.infer<typeof cameraSchema>;
 
+/**
+ * What a hand does, which joint positions alone cannot tell: holding (a fist on a collar, a
+ * sleeve, a wrist), pushing or posted (flat), or free (relaxed). A hand left out is "auto": the
+ * renderer decides from the distance to the other body. Optional, so no skeleton version bump.
+ */
+export const HAND_STATES = ['grip', 'push', 'free'] as const;
+export const handStateSchema = z.enum(HAND_STATES);
+export type HandState = z.infer<typeof handStateSchema>;
+export const HAND_STATE_LABELS_FR: Record<HandState, string> = {
+  grip: 'Tient',
+  push: 'Pousse',
+  free: 'Libre',
+};
+
+export const HAND_SIDES = ['L', 'R'] as const;
+export type HandSide = (typeof HAND_SIDES)[number];
+
+const fighterHandsSchema = z.strictObject({
+  L: handStateSchema.optional(),
+  R: handStateSchema.optional(),
+});
+export const handsSchema = z.strictObject({
+  me: fighterHandsSchema.optional(),
+  opponent: fighterHandsSchema.optional(),
+});
+export type Hands = z.infer<typeof handsSchema>;
+
 export const poseV1_11Schema = z.strictObject({
   skeleton: z.literal(SKELETON_V1_11),
   fighters: z.strictObject({
@@ -83,5 +110,6 @@ export const poseV1_11Schema = z.strictObject({
     opponent: fighterPoseV1_11Schema,
   }),
   camera: cameraSchema.optional(),
+  hands: handsSchema.optional(),
 });
 export type PoseV1_11 = z.infer<typeof poseV1_11Schema>;

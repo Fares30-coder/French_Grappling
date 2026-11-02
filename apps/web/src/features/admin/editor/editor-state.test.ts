@@ -309,6 +309,26 @@ describe('copyPreviousPose / mirror / camera', () => {
     state = run(state, { type: 'setStepCamera', camera: undefined });
     expect(state.technique.steps[0]?.pose).not.toHaveProperty('camera');
   });
+
+  it('sets and clears a hand state on the current step only, as one undo entry', () => {
+    const start = fresh();
+    let state = run(start, { type: 'setHand', fighter: 'me', side: 'L', state: 'grip' });
+    expect(state.technique.steps[0]?.pose.hands).toEqual({ me: { L: 'grip' } });
+    expect(state.technique.steps[1]?.pose).not.toHaveProperty('hands');
+    expect(techniqueUpdateInputSchema.safeParse(toUpdateInput(state)).success).toBe(true);
+    expect(run(state, { type: 'undo' }).technique).toEqual(start.technique);
+    state = run(state, { type: 'setHand', fighter: 'me', side: 'L', state: undefined });
+    expect(state.technique.steps[0]?.pose).not.toHaveProperty('hands');
+  });
+
+  it('mirrors hand states with the pose', () => {
+    const state = run(
+      fresh(),
+      { type: 'setHand', fighter: 'opponent', side: 'R', state: 'push' },
+      { type: 'mirror', scope: 'step' },
+    );
+    expect(state.technique.steps[0]?.pose.hands).toEqual({ opponent: { L: 'push' } });
+  });
 });
 
 describe('selectors', () => {

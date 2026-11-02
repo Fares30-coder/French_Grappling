@@ -85,6 +85,18 @@ describe('currentPoseSchema', () => {
     p.fighters.third = deepClone(p.fighters.me) as Record<string, unknown>;
     expect(currentPoseSchema.safeParse(p).success).toBe(false);
   });
+
+  it('accepts hand states, all optional', () => {
+    const p = { ...clone(), hands: { me: { L: 'grip', R: 'push' }, opponent: { R: 'free' } } };
+    expect(currentPoseSchema.safeParse(p).success).toBe(true);
+    expect(currentPoseSchema.safeParse({ ...clone(), hands: {} }).success).toBe(true);
+  });
+
+  it('rejects an unknown hand state, side or fighter', () => {
+    for (const hands of [{ me: { L: 'pinch' } }, { me: { M: 'grip' } }, { third: { L: 'grip' } }]) {
+      expect(currentPoseSchema.safeParse({ ...clone(), hands }).success).toBe(false);
+    }
+  });
 });
 
 describe('upgradePose', () => {

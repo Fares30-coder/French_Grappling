@@ -1,4 +1,11 @@
-import type { AdminTechnique, CameraHint, Vec3 } from '@tatamap/shared';
+import {
+  type AdminTechnique,
+  type CameraHint,
+  type HandSide,
+  type HandState,
+  handState,
+  type Vec3,
+} from '@tatamap/shared';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { ApiRequestError } from '../../../lib/api';
@@ -123,6 +130,22 @@ function TechniqueEditor({
       : null;
   const moveSelected = (position: Vec3) => {
     if (selectedJoint) dispatch({ type: 'setJoint', joint: selectedJoint, position });
+  };
+  const selectedSide: HandSide | null =
+    selectedJoint?.joint === 'handL' ? 'L' : selectedJoint?.joint === 'handR' ? 'R' : null;
+  const selectedHandState =
+    selectedJoint && selectedSide && currentStep
+      ? handState(currentStep.pose, selectedJoint.fighter, selectedSide)
+      : undefined;
+  const setSelectedHand = (handValue: HandState | undefined) => {
+    if (selectedJoint && selectedSide) {
+      dispatch({
+        type: 'setHand',
+        fighter: selectedJoint.fighter,
+        side: selectedSide,
+        state: handValue,
+      });
+    }
   };
 
   const input = useMemo(() => toUpdateInput(state), [state]);
@@ -394,6 +417,8 @@ function TechniqueEditor({
               position={selectedPosition}
               onSelect={(joint) => dispatch({ type: 'selectJoint', joint })}
               onMove={moveSelected}
+              handState={selectedHandState}
+              onHandState={setSelectedHand}
             />
           </div>
           <div className="mt-6">
