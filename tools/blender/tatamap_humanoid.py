@@ -79,6 +79,7 @@ def _bend_dir(root, mid, end, straight_dir, fade_cm=6):
     return d.normalized() if d.length > 1e-6 else straight_dir
 
 
+DELTOID_CM = 8
 UPPER_ARM_CM = (21, 36)  # shoulder -> elbow kept in this range (v1-11 measures from the neck)
 SHOULDER_SHIFT_CM = 7
 
@@ -168,6 +169,16 @@ for _s in 'LR':
     })
 
 
+def _deltoid(clavicle, upper_arm):
+    """(head, tail, z) of the deltoid bone: at the shoulder, its axes halfway between the
+    clavicle's and the upper arm's, so the top of the shoulder rounds over a raised arm instead
+    of folding between two bones."""
+    (ch, ct, cz), (ah, at, az) = clavicle, upper_arm
+    y = (ct - ch).normalized() + (at - ah).normalized()
+    y = y.normalized() if y.length > 1e-3 else (at - ah).normalized()
+    return ah, ah + y * DELTOID_CM, cz.normalized() + az.normalized()
+
+
 def _axes(head, tail, ref):
     """Unit axes (x, y, z) of a bone: y from head to tail, z towards `ref`."""
     y = (tail - head).normalized()
@@ -226,8 +237,8 @@ for _s in 'LR':
 # Typical radius (cm) of each body part, to compare a vertex's distance to several bones.
 PART_RADIUS = {'pelvis': 14, 'abdomen': 12, 'chest': 14, 'neck': 6}
 for _s in 'LR':
-    PART_RADIUS.update({f'clavicle.{_s}': 7, f'upper_arm.{_s}': 5.5, f'forearm.{_s}': 4.2,
-                        f'thigh.{_s}': 8.5, f'shin.{_s}': 5.5})
+    PART_RADIUS.update({f'clavicle.{_s}': 7, f'deltoid.{_s}': 6.5, f'upper_arm.{_s}': 5.5,
+                        f'forearm.{_s}': 4.2, f'thigh.{_s}': 8.5, f'shin.{_s}': 5.5})
 # Limbs take over a little below their joint with the torso: buttocks follow the pelvis and
 # the top of the shoulder the clavicle, so a bent thigh or a raised arm does not fold the torso.
 WEIGHT_START = {f'{b}.{s}': f for s in 'LR' for b, f in (('upper_arm', 0.2), ('thigh', 0.25))}
@@ -456,6 +467,12 @@ def _build_humanoid(fid, rgb):
         b = arm.edit_bones.new(name)
         b.head, b.tail = to_bl(q[h]), to_bl(q[t])
         b.align_roll(to_bl(refs[ref]) - to_bl((0, 0, 0)))
+    rest_bones = {n: (q[h], q[t], _axes(q[h], q[t], refs[ref])[2]) for n, (h, t, ref) in HBONES.items()}
+    for s in 'LR':
+        h, t, z = _deltoid(rest_bones['clavicle.' + s], rest_bones['upper_arm.' + s])
+        b = arm.edit_bones.new('deltoid.' + s)
+        b.head, b.tail = to_bl(h), to_bl(t)
+        b.align_roll(to_bl(z) - to_bl((0, 0, 0)))
     hand_rest = {}
     for s, sign in (('L', 1), ('R', -1)):
         hand_rest[s] = _hand_bones(q['wrist' + s], q['finger' + s], refs['thumb' + s], s, sign, 0.0)
@@ -476,9 +493,13 @@ def _build_humanoid(fid, rgb):
     body.data.skin_vertices[0].data[names.index('hip')].use_root = True
     body.modifiers.new('Smooth', 'SUBSURF').levels = 2
     _bake_modifiers(body)
+    def rest_bones_deltoid(n):
+        h, t, _z = _deltoid(rest_bones['clavicle.' + n[-1]], rest_bones['upper_arm.' + n[-1]])
+        return h, t
+
     segments = {}
     for n, r in PART_RADIUS.items():
-        a, b = q[HBONES[n][0]], q[HBONES[n][1]]
+        a, b = (q[HBONES[n][0]], q[HBONES[n][1]]) if n in HBONES else rest_bones_deltoid(n)
         segments[n] = (to_bl(a.lerp(b, WEIGHT_START.get(n, 0))), to_bl(b), r / 100)
     groups = {n: body.vertex_groups.new(name=n) for n in list(segments) + list(TWIST.values())}
     for v in body.data.vertices:
@@ -587,6 +608,8 @@ def bone_frames(f, prev=None, other=None, hands=None):
                 z = Matrix.Rotation(max(-limit, min(limit, angle)), 3, y) @ before
         bones[name] = (q[h], q[t], z)
     state = {'fwd': refs['fwd'], 'z': {n: b[2] for n, b in bones.items()}, 'hand': {}}
+    for s in 'LR':
+        bones['deltoid.' + s] = _deltoid(bones['clavicle.' + s], bones['upper_arm.' + s])
     for s, sign in (('L', 1), ('R', -1)):
         wanted = (hands or {}).get(s)
         shape = HAND_SHAPES[wanted] if wanted in HAND_SHAPES else grip_amount(f, s, other)
