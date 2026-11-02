@@ -5,6 +5,7 @@ import {
   type CurrentPose,
   DEFAULT_HOLD_MS,
   type FighterId,
+  interpolatePose,
   type JointV1_11,
 } from '@tatamap/shared';
 import {
@@ -19,7 +20,6 @@ import {
 import { OrthographicCamera as OrthographicCameraImpl, Vector3 } from 'three';
 import { type CameraFrame, fitStepCamera, frameCamera, type ViewPreset } from './camera';
 import { FighterMesh, type FighterMeshHandle } from './FighterMesh';
-import { interpolatePose } from './interpolate';
 import { shouldReapplyPose } from './reapply';
 import { Tatami } from './Tatami';
 import { buildTimeline, isStepEcho, sampleTimeline, timeAtStep } from './timeline';

@@ -90,11 +90,14 @@ Pour écrire et vérifier des poses sans passer par l'éditeur web (package `too
 
 ```sh
 pnpm pose:check <slug|chemin.json> [--strict]   # contrôle une technique de CONTENT_DIR (défaut content/)
+pnpm pose:separate <slug|chemin.json> [--write] [--steps-only]   # écarte les corps qui s'enfoncent
 pnpm pose:render <slug|chemin.json> [--out dossier] [--steps 1,3] [--views 3d,face]
 pnpm --filter @tatamap/pose-kit exec playwright install chromium   # une seule fois
 ```
 
 - `pose:check` : validation du schéma (bloquante, code de sortie 1), puis, par étape, longueurs d'os hors tolérance (12 %) par rapport au **corps standard** `STANDARD_BODY_V1_11` de `@tatamap/shared` (même règle que l'éditeur ; l'ancienne comparaison avec l'étape 1 a disparu), articulations qui s'enfoncent dans le tatami, et alertes d'interpénétration. Cette dernière est une **heuristique grossière** sur le squelette nu (segments à moins de 6 cm, ou qui traversent le buste ou la tête de l'autre) : une prise au col peut la déclencher.
+  S'y ajoute le **volume du mannequin** (`volume.ts`, mêmes rayons que le mannequin Blender) : capsules pour le buste (deux côte à côte, plus large que profond), la tête, les bras, les mains, les cuisses, les tibias et les pieds. `sinks in` signale deux parties enfoncées de plus de 3 cm l'une dans l'autre (entre les deux combattants, ou chez un même combattant : bras dans sa propre cuisse, avant-bras dans son ventre ou sa tête…), `to next` la même chose au pire moment de la transition vers l'étape suivante (les os tournent comme sur le site).
+- `pose:separate` : écarte ces parties (relaxation : chaque paire est repoussée, puis les longueurs d'os sont rétablies, le tatami respecté et la pose rappelée vers l'originale), sur toutes les étapes à la fois et au milieu des transitions. Aucune articulation ne bouge de plus de 15 cm. Sans `--write`, affiche seulement ce qui changerait ; `--steps-only` ignore les transitions (étapes qui ne se suivent pas, comme `poses-de-reference`). Un membre qui passe d'un côté à l'autre d'un autre entre deux étapes ne peut pas être corrigé ainsi : il faut une étape intermédiaire. Vérifier ensuite dans l'éditeur.
 - `pose:render` : lance Vite sur un port libre (arrêté ensuite), ouvre la route **dev uniquement** `/dev/pose-preview` (absente du build de production) avec le vrai viewer, et écrit dans `.pose-renders/<slug>/` (ignoré par git, ou `--out`) un PNG par étape et par vue (`3d` = caméra conseillée, `face` = plan x/y, `profil` = plan z/y, `dessus`) plus `contact-sheet.png`, qui regroupe tout en une image. `--server http://127.0.0.1:5173` réutilise un serveur déjà lancé.
 - La bibliothèque (`@tatamap/pose-kit`) fournit `twoBoneIk`, `buildFighter`, `STANDARD_LENGTHS` (le corps standard, longueurs recommandées par défaut pour `buildFighter`), `rotateFighterX/Y/Z`, `translateFighter`, `boneLengthsOf`, `makePose` ; voir `tools/pose-kit/src/`.
 
@@ -109,4 +112,4 @@ pnpm --filter @tatamap/pose-kit exec playwright install chromium   # une seule f
 | `pnpm db:test:reset` | recrée la base de test |
 | `pnpm admin:create <email>` | crée l'admin ou change son mot de passe |
 | `pnpm content:export` / `pnpm content:import` | sauvegarde / restauration du contenu |
-| `pnpm pose:check` / `pnpm pose:render` | contrôle / captures d'une technique (voir « Outils d'animation ») |
+| `pnpm pose:check` / `pnpm pose:separate` / `pnpm pose:render` | contrôle / écartement des corps / captures d'une technique (voir « Outils d'animation ») |

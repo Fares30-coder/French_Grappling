@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "check": "tsx src/cli/check.ts",
+    "separate": "tsx src/cli/separate.ts",
     "render": "tsx src/cli/render.ts"
   },
   "dependencies": {

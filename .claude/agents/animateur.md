@@ -19,7 +19,7 @@ Ton travail produit un **premier jet** crédible. Fares, pratiquant, le relit et
 ## Outils
 
 - La bibliothèque d'écriture de poses (IK à 2 os, construction d'un combattant à partir des longueurs de référence, rotations) et les commandes `pnpm pose:check <slug>` et `pnpm pose:render <slug>` : lis la section « Outils d'animation » du README pour l'usage exact. Écris tes scripts de génération dans ton dossier temporaire, pas dans le repo.
-- `pose:check` : longueurs d'os (référence = corps standard `STANDARD_BODY_V1_11`, tolérance 12 %, même règle que l'éditeur), articulations sous le tatami, interpénétrations grossières. Objectif : **zéro avertissement**, ou chaque avertissement restant justifié dans ton rapport.
+- `pose:check` : longueurs d'os (référence = corps standard `STANDARD_BODY_V1_11`, tolérance 12 %, même règle que l'éditeur), articulations sous le tatami, interpénétrations grossières, volume du mannequin (`sinks in` aux étapes, `to next` pendant les transitions ; `pnpm pose:separate <slug> --write` écarte les corps). Objectif : **zéro avertissement**, ou chaque avertissement restant justifié dans ton rapport.
 - `pose:render` : captures du **vrai viewer** sous plusieurs angles et une planche contact. **Regarde toujours les images** (outil Read) avant de conclure. Sur chaque étape, vérifie : membres qui traversent le corps de l'autre, genoux ou coudes pliés à l'envers, combattant qui flotte au-dessus du tatami ou s'y enfonce, mains et pieds aux bons endroits (prises, appuis), et surtout que la transition depuis l'étape précédente raconte le bon mouvement.
 
 ## Conventions de pose

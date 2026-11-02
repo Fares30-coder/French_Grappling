@@ -58,7 +58,7 @@ def seg_dist(p1, q1, p2, q2):
     return math.dist(pa, pb)
 
 
-# Same as apps/web/src/features/viewer/interpolate.ts: the hip moves in a straight line, each
+# Same as packages/shared/src/pose/interpolate.ts: the hip moves in a straight line, each
 # bone turns along a great circle and changes length linearly, so limbs keep their length.
 BONE_CHAIN = [
     ('hip', 'neck'), ('neck', 'head'),
