@@ -39,6 +39,19 @@ def _v(p):
     return Vector(p)
 
 
+MAX_TURN_DEG = 15  # per frame (30 fps): a pop in the derived facing or roll becomes a quick turn
+
+
+def _turn_towards(a, b, max_deg):
+    """Unit vector b, or a turned towards b by at most max_deg."""
+    if a.angle(b, 0.0) <= math.radians(max_deg):
+        return b.copy()
+    axis = a.cross(b)
+    if axis.length < 1e-6:
+        axis = a.orthogonal()
+    return Matrix.Rotation(math.radians(max_deg), 3, axis.normalized()) @ a
+
+
 def _frame(f, prev_forward=None):
     """Orthonormal body frame (up, forward, left) of a v1-11 fighter."""
     hip, neck = _v(f['hip']), _v(f['neck'])
@@ -49,6 +62,10 @@ def _frame(f, prev_forward=None):
         fwd = prev_forward.copy() if prev_forward is not None else Vector((1, 0, 0))
         fwd -= up * fwd.dot(up)
     fwd.normalize()
+    if prev_forward is not None:  # the torso turns at most MAX_TURN_DEG per frame
+        before = prev_forward - up * prev_forward.dot(up)
+        if before.length > 1e-3:
+            fwd = _turn_towards(before.normalized(), fwd, MAX_TURN_DEG)
     left = up.cross(fwd).normalized()
     fwd = left.cross(up).normalized()
     return up, fwd, left
@@ -60,6 +77,34 @@ def _bend_dir(root, mid, end, straight_dir, fade_cm=6):
     w = min(1.0, off.length / fade_cm)
     d = (off.normalized() if off.length > 1e-6 else straight_dir) * w + straight_dir * (1 - w)
     return d.normalized() if d.length > 1e-6 else straight_dir
+
+
+UPPER_ARM_CM = (21, 36)  # shoulder -> elbow kept in this range (v1-11 measures from the neck)
+SHOULDER_SHIFT_CM = 7
+
+
+def _shoulder(nominal, elbow, fwd, up):
+    """Shoulder point, moved like a shoulder blade so the upper arm is never crushed or overlong:
+    away from an elbow that comes too close (depression), towards one that is far (protraction),
+    and a little forward / up with the arm."""
+    # Mid-transition (joints interpolated linearly) the elbow can pass through the shoulder:
+    # every shift fades out as it gets close, so the shoulder never jumps.
+    near = min(1.0, (elbow - nominal).length / 8)
+    reach = (elbow - nominal).normalized() * near
+    s = nominal + (fwd * max(0.0, reach.dot(fwd)) + up * max(0.0, reach.dot(up))) * 3
+    d = (elbow - s).length
+    lo, hi = UPPER_ARM_CM
+    shift = min(d - lo, 0.0) + max(d - hi, 0.0)  # < 0: move away from the elbow
+    shift = max(-SHOULDER_SHIFT_CM, min(SHOULDER_SHIFT_CM, shift)) * min(1.0, d / 8)
+    return s + (elbow - s).normalized() * shift
+
+
+def _swing_ref(direction, up, fwd, left):
+    """Roll of a limb's top half that only swings from "pointing forward", with no twist
+    against the torso: the twist (elbow or knee direction) is taken by the bottom half."""
+    local = Vector((direction.dot(left), direction.dot(up), direction.dot(fwd))).normalized()
+    z = Vector((0, 0, 1)).rotation_difference(local) @ Vector((0, 1, 0))
+    return left * z.x + up * z.y + fwd * z.z
 
 
 def derived_points(f, prev_forward=None):
@@ -79,10 +124,7 @@ def derived_points(f, prev_forward=None):
     }
     refs = {'up': up, 'fwd': fwd, 'left': left}
     for s, sign in (('L', 1), ('R', -1)):
-        # Shoulder blade: the shoulder follows the arm a little forward / up (at most 4 cm).
-        shoulder = neck + left * (17 * sign) - up * 5
-        reach = (p['elbow' + s] - shoulder).normalized()
-        q['shoulder' + s] = shoulder + (fwd * max(0.0, reach.dot(fwd)) + up * max(0.0, reach.dot(up))) * 4
+        q['shoulder' + s] = _shoulder(neck + left * (17 * sign) - up * 5, p['elbow' + s], fwd, up)
         q['elbow' + s] = p['elbow' + s]
         fore = (p['hand' + s] - p['elbow' + s]).normalized()
         q['wrist' + s] = p['hand' + s] - fore * 7
@@ -99,6 +141,8 @@ def derived_points(f, prev_forward=None):
         refs['thumb' + s] = -elbow
         refs['knee' + s] = _bend_dir(q['hipj' + s], q['knee' + s], q['ankle' + s], fwd)
         refs['foot_top' + s] = q['knee' + s] - q['ankle' + s]
+        refs['arm_swing' + s] = _swing_ref(q['elbow' + s] - q['shoulder' + s], up, fwd, left)
+        refs['leg_swing' + s] = _swing_ref(q['knee' + s] - q['hipj' + s], up, fwd, left)
     return q, refs
 
 
@@ -113,10 +157,12 @@ HBONES = {
 for _s in 'LR':
     HBONES.update({
         f'clavicle.{_s}': ('clav', 'shoulder' + _s, 'fwd'),
-        f'upper_arm.{_s}': ('shoulder' + _s, 'elbow' + _s, 'elbow' + _s),
+        f'upper_arm.{_s}': ('shoulder' + _s, 'elbow' + _s, 'arm_swing' + _s),
+        f'upper_arm_twist.{_s}': ('shoulder' + _s, 'elbow' + _s, 'elbow' + _s),
         f'forearm.{_s}': ('elbow' + _s, 'wrist' + _s, 'elbow' + _s),
         f'hand.{_s}': ('wrist' + _s, 'finger' + _s, 'thumb' + _s),
-        f'thigh.{_s}': ('hipj' + _s, 'knee' + _s, 'knee' + _s),
+        f'thigh.{_s}': ('hipj' + _s, 'knee' + _s, 'leg_swing' + _s),
+        f'thigh_twist.{_s}': ('hipj' + _s, 'knee' + _s, 'knee' + _s),
         f'shin.{_s}': ('knee' + _s, 'ankle' + _s, 'knee' + _s),
         f'foot.{_s}': ('ankle' + _s, 'toe' + _s, 'foot_top' + _s),
     })
@@ -185,6 +231,9 @@ for _s in 'LR':
 # Limbs take over a little below their joint with the torso: buttocks follow the pelvis and
 # the top of the shoulder the clavicle, so a bent thigh or a raised arm does not fold the torso.
 WEIGHT_START = {f'{b}.{s}': f for s in 'LR' for b, f in (('upper_arm', 0.2), ('thigh', 0.25))}
+# Upper arm and thigh: the top follows the torso without twist, the bottom the elbow or knee;
+# their weights cross-fade along the bone, so the twist spreads over its whole length.
+TWIST = {f'{b}.{s}': f'{b}_twist.{s}' for s in 'LR' for b in ('upper_arm', 'thigh')}
 WEIGHT_BAND = 0.45  # blend zone at joints, in part radii
 
 
@@ -337,15 +386,21 @@ def _foot_objects(name, q, refs, s, sign):
 
 def _seg_weights(co, segments):
     """Weights of the bones whose surface a vertex is on (normalised, sharp blend at joints)."""
-    scaled = {}
+    scaled, along = {}, {}
     for name, (a, b, radius) in segments.items():
         closest, t = intersect_point_line(co, a, b)
         closest = a if t < 0 else b if t > 1 else closest
         scaled[name] = (co - closest).length / radius
+        along[name] = min(1.0, max(0.0, t))
     best = min(scaled.values())
     w = {n: (1 - (d - best) / WEIGHT_BAND) ** 2 for n, d in scaled.items() if d - best < WEIGHT_BAND}
     total = sum(w.values())
-    return {n: x / total for n, x in w.items()}
+    w = {n: x / total for n, x in w.items()}
+    for n in [n for n in w if n in TWIST]:
+        k = _smoothstep(along[n])
+        w[TWIST[n]] = w[n] * k
+        w[n] *= 1 - k
+    return w
 
 
 def _set_group(obj, bone):
@@ -383,7 +438,7 @@ def _build_humanoid(fid, rgb):
     for n, r in PART_RADIUS.items():
         a, b = q[HBONES[n][0]], q[HBONES[n][1]]
         segments[n] = (to_bl(a.lerp(b, WEIGHT_START.get(n, 0))), to_bl(b), r / 100)
-    groups = {n: body.vertex_groups.new(name=n) for n in segments}
+    groups = {n: body.vertex_groups.new(name=n) for n in list(segments) + list(TWIST.values())}
     for v in body.data.vertices:
         for n, w in _seg_weights(v.co, segments).items():
             groups[n].add([v.index], w, 'REPLACE')
@@ -418,7 +473,9 @@ def _build_humanoid(fid, rgb):
     body.data.materials.append(_material(f'{fid}_skin', rgb, 0.55))
 
     body.parent = rig
-    body.modifiers.new('Armature', 'ARMATURE').object = rig
+    mod = body.modifiers.new('Armature', 'ARMATURE')
+    mod.object = rig
+    mod.use_deform_preserve_volume = True  # dual quaternions: elbows and knees keep their volume
     rig.data.display_type = 'STICK'
     return rig, body
 
@@ -437,16 +494,34 @@ def build_humanoids():
     return made
 
 
-def pose_humanoid(rig, f, prev_forward=None):
-    """Poses a humanoid rig on a v1-11 fighter; returns the forward vector used."""
-    q, refs = derived_points(f, prev_forward)
-    inv = rig.matrix_world.inverted()
+def bone_frames(f, prev=None):
+    """Each bone's (head, tail, z axis) in Tatamap cm for a v1-11 fighter, and the state to
+    pass as `prev` for the next frame: rolls then turn at most MAX_TURN_DEG per frame."""
+    q, refs = derived_points(f, prev['fwd'] if prev else None)
+    bones = {}
     for name, (h, t, ref) in HBONES.items():
+        _x, y, z = _axes(q[h], q[t], refs[ref])
+        if prev:  # turn the previous roll about the bone towards the new one
+            before = prev['z'][name] - y * prev['z'][name].dot(y)
+            if before.length > 1e-3:
+                before.normalize()
+                angle = math.atan2(y.dot(before.cross(z)), before.dot(z))
+                limit = math.radians(MAX_TURN_DEG)
+                z = Matrix.Rotation(max(-limit, min(limit, angle)), 3, y) @ before
+        bones[name] = (q[h], q[t], z)
+    return bones, {'fwd': refs['fwd'], 'z': {n: b[2] for n, b in bones.items()}}
+
+
+def pose_humanoid(rig, f, prev=None):
+    """Poses a humanoid rig on a v1-11 fighter; returns the state for the next frame."""
+    bones, state = bone_frames(f, prev)
+    inv = rig.matrix_world.inverted()
+    origin = to_bl((0, 0, 0))
+    for name, (head, tail, z) in bones.items():
         pb = rig.pose.bones[name]
-        rest = rig.data.bones[name].length
-        ref_v = to_bl(refs[ref]) - to_bl((0, 0, 0))
-        pb.matrix = inv @ _bone_matrix(to_bl(q[h]), to_bl(q[t]), ref_v, rest)
-    return refs['fwd']
+        pb.matrix = inv @ _bone_matrix(to_bl(head), to_bl(tail), to_bl(z) - origin,
+                                       rig.data.bones[name].length)
+    return state
 
 
 def _smoothstep(t):

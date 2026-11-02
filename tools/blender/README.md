@@ -43,6 +43,9 @@ thumb) and feet (heel, arch, five toes), on an armature that follows the 11 join
 (forward = the thighs' direction across the spine) and the limbs' twist (towards the elbow and
 knee points) are derived from the joints. Body weights are computed from each vertex's distance
 to the bones, scaled by the part's radius, so a bent thigh or arm does not drag the torso.
+Upper arms and thighs have a twist bone (the twist spreads along the limb instead of pinching
+the shoulder or the hip), the skin keeps its volume at the joints (dual quaternions), and the
+derived rolls and facing turn at most 15 degrees per frame, so they never pop.
 
 ```python
 build_humanoids()                    # hides the stick mannequins from renders
