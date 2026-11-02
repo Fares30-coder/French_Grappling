@@ -44,7 +44,8 @@ thumb) and feet (heel, arch, five toes), on an armature that follows the 11 join
 knee points) are derived from the joints. Body weights are computed from each vertex's distance
 to the bones, scaled by the part's radius, so a bent thigh or arm does not drag the torso.
 Upper arms and thighs have a twist bone (the twist spreads along the limb instead of pinching
-the shoulder or the hip), the skin keeps its volume at the joints (dual quaternions), and the
+the shoulder or the hip), a deltoid bone halfway between the clavicle and the upper arm rounds the
+shoulder over a raised arm, the skin keeps its volume at the joints (dual quaternions), and the
 derived rolls and facing turn at most 15 degrees per frame, so they never pop.
 Each finger has three phalanx bones and the thumb three. A hand follows the pose's `hands`
 (`grip`: fist, `push`: flat, `free`: relaxed; set in the editor, ADR 0002 addendum). A hand left
