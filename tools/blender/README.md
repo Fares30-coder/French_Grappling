@@ -46,6 +46,9 @@ to the bones, scaled by the part's radius, so a bent thigh or arm does not drag 
 Upper arms and thighs have a twist bone (the twist spreads along the limb instead of pinching
 the shoulder or the hip), the skin keeps its volume at the joints (dual quaternions), and the
 derived rolls and facing turn at most 15 degrees per frame, so they never pop.
+Each finger has three phalanx bones and the thumb three: a hand closes into a grip when its
+point is within 3 cm of the opponent's body (or of the fighter's other hand), opens beyond
+10 cm, and changes at most 0.12 per frame. `bake_humanoids` passes the opponent's joints.
 
 ```python
 build_humanoids()                    # hides the stick mannequins from renders

@@ -340,25 +340,52 @@ PALM = [(-2.0, 0.0, 0.0, 1.4, 2.2), (-0.8, 0.0, 0.0, 1.55, 2.6), (2.5, 0.15, 0.2
         (9.2, 0.0, 0.1, 1.25, 3.85)]
 
 
+# Closed hand (a grip): curl at each finger knuckle, and the thumb wrapped over the fingers.
+FIST_CURL = (78, 95, 55)
+THUMB_FIST = [(0.9, 1.6, 1.6), (2.6, 3.8, 2.4), (4.0, 5.6, 1.2), (4.6, 7.2, -0.6)]
+
+
+def _finger_points(grip):
+    """Local points (palm side x, along y, thumb side z) of the four fingers and the thumb, from
+    relaxed (grip 0) to a closed fist (grip 1). Each finger: inside the palm, knuckle, 3 joints."""
+    palm_side = Vector((1, 0, 0))
+    fingers = []
+    for across, length, spread, _r in FINGERS:
+        d = _rotate(Vector((0, 1, 0)), palm_side, -spread)
+        pt = Vector((0, 9.2, across))
+        pts = [Vector((0, 7.0, across)), pt]
+        for frac, relaxed, fist in zip(PHALANX, FINGER_CURL, FIST_CURL):
+            d = _rotate(d, d.cross(palm_side).normalized(), relaxed + (fist - relaxed) * grip)
+            pt = pt + d * (length * frac)
+            pts.append(pt)
+        fingers.append(pts)
+    thumb = [Vector(p).lerp(Vector(f), grip) for (p, _r), f in zip(THUMB, THUMB_FIST)]
+    return fingers, thumb
+
+
+def _hand_bones(head, tail, z, s, sign, grip):
+    """Finger and thumb bones (head, tail, z) in Tatamap cm, for a hand bone head -> tail."""
+    axes = _axes(head, tail, z)
+    at = _local(head, axes, sign)
+    fingers, thumb = _finger_points(grip)
+    bones = {}
+    for i, pts in enumerate(fingers):
+        for k in range(3):
+            bones[f'finger{i}_{k}.{s}'] = (at(*pts[k + 1]), at(*pts[k + 2]), axes[2])
+    for k in range(3):
+        bones[f'thumb_{k}.{s}'] = (at(*thumb[k]), at(*thumb[k + 1]), axes[0] * sign)
+    return bones
+
+
 def _hand_objects(name, q, refs, s, sign):
     """Palm, fingers and thumb of one hand. Local: y along the hand, z thumb side, x palm side."""
     at = _local(q['wrist' + s], _axes(q['wrist' + s], q['finger' + s], refs['thumb' + s]), sign)
-    pieces = [_loft_object(name + '_palm', at, PALM)]
-
+    fingers, thumb = _finger_points(0.0)
     chains = []
-    palm_side = Vector((1, 0, 0))
-    for across, length, spread, r in FINGERS:
-        d = _rotate(Vector((0, 1, 0)), palm_side, -spread)
-        pt = Vector((0, 9.2, across))
-        chain = [(at(0, 7.0, across), r), (at(*pt), r)]
-        for k, (frac, curl) in enumerate(zip(PHALANX, FINGER_CURL)):
-            d = _rotate(d, d.cross(palm_side).normalized(), curl)
-            pt = pt + d * (length * frac)
-            chain.append((at(*pt), r * (1 - 0.1 * (k + 1))))
-        chains.append(chain)
-    chains.append([(at(*p), r) for p, r in THUMB])
-    pieces.append(_skin_object(name + '_fingers', chains))
-    return pieces
+    for (_a, _l, _sp, r), pts in zip(FINGERS, fingers):
+        chains.append([(at(*p), r * (1 - 0.1 * max(0, k - 1))) for k, p in enumerate(pts)])
+    chains.append([(at(*p), r) for p, (_p, r) in zip(thumb, THUMB)])
+    return _loft_object(name + '_palm', at, PALM), _skin_object(name + '_fingers', chains)
 
 
 # Toes, big to little: (medial offset cm, length past the ball cm, radius cm)
@@ -421,6 +448,13 @@ def _build_humanoid(fid, rgb):
         b = arm.edit_bones.new(name)
         b.head, b.tail = to_bl(q[h]), to_bl(q[t])
         b.align_roll(to_bl(refs[ref]) - to_bl((0, 0, 0)))
+    hand_rest = {}
+    for s, sign in (('L', 1), ('R', -1)):
+        hand_rest[s] = _hand_bones(q['wrist' + s], q['finger' + s], refs['thumb' + s], s, sign, 0.0)
+        for name, (h, t, z) in hand_rest[s].items():
+            b = arm.edit_bones.new(name)
+            b.head, b.tail = to_bl(h), to_bl(t)
+            b.align_roll(to_bl(z) - to_bl((0, 0, 0)))
     bpy.ops.object.mode_set(mode='OBJECT')
 
     # Body: skin modifier on a stick figure, smoothed; weights from the distance to each bone.
@@ -456,9 +490,17 @@ def _build_humanoid(fid, rgb):
     _set_group(head, 'head')
     pieces = [head]
     for s, sign in (('L', 1), ('R', -1)):
-        for obj in _hand_objects(f'{fid}_hand.{s}', q, refs, s, sign):
-            _set_group(obj, 'hand.' + s)
-            pieces.append(obj)
+        palm, fingers = _hand_objects(f'{fid}_hand.{s}', q, refs, s, sign)
+        _set_group(palm, 'hand.' + s)
+        # Fingers: each vertex on its phalanx; the part inside the palm stays on the hand.
+        segs = {n: (to_bl(h), to_bl(t), (1.0 if n.startswith('finger') else 1.3) / 100)
+                for n, (h, t, _z) in hand_rest[s].items()}
+        segs['hand.' + s] = (to_bl(q['wrist' + s]), to_bl(q['wrist' + s].lerp(q['finger' + s], 0.5)), 0.02)
+        groups = {n: fingers.vertex_groups.new(name=n) for n in segs}
+        for v in fingers.data.vertices:
+            for n, w in _seg_weights(v.co, segs).items():
+                groups[n].add([v.index], w, 'REPLACE')
+        pieces += [palm, fingers]
         for obj in _foot_objects(f'{fid}_foot.{s}', q, refs, s, sign):
             _set_group(obj, 'foot.' + s)
             pieces.append(obj)
@@ -494,9 +536,35 @@ def build_humanoids():
     return made
 
 
-def bone_frames(f, prev=None):
+GRIP_CM = (3, 10)  # hand point to the opponent's surface: closed below, relaxed above
+GRIP_SPEED = 0.12  # most the grip changes per frame (about a quarter of a second to close)
+# The opponent's volume, as capsules: (joint, joint, radius cm).
+BODY_CAPSULES = [('hip', 'neck', 14), ('neck', 'head', 6), ('head', 'head', 12)] + [
+    c for s in 'LR' for c in (('neck', 'elbow' + s, 5), ('elbow' + s, 'hand' + s, 4),
+                              ('hip', 'knee' + s, 8), ('knee' + s, 'foot' + s, 5.5))]
+
+
+def _segment_distance(p, a, b):
+    closest, t = intersect_point_line(p, a, b) if (b - a).length > 1e-6 else (a, 0.0)
+    return (p - (a if t < 0 else b if t > 1 else closest)).length
+
+
+def grip_amount(f, s, other=None):
+    """How closed hand s is (0 relaxed, 1 fist): it closes on the opponent's body, or on the
+    fighter's other hand (hands clasped)."""
+    hand = _v(f['hand' + s])
+    gap = (hand - _v(f['hand' + ('R' if s == 'L' else 'L')])).length - 6
+    if other:
+        o = {k: _v(v) for k, v in other.items()}
+        gap = min([gap] + [_segment_distance(hand, o[a], o[b]) - r for a, b, r in BODY_CAPSULES])
+    lo, hi = GRIP_CM
+    return _smoothstep(min(1.0, max(0.0, (hi - gap) / (hi - lo))))
+
+
+def bone_frames(f, prev=None, other=None):
     """Each bone's (head, tail, z axis) in Tatamap cm for a v1-11 fighter, and the state to
-    pass as `prev` for the next frame: rolls then turn at most MAX_TURN_DEG per frame."""
+    pass as `prev` for the next frame: rolls then turn at most MAX_TURN_DEG per frame, and
+    grips change at most GRIP_SPEED per frame."""
     q, refs = derived_points(f, prev['fwd'] if prev else None)
     bones = {}
     for name, (h, t, ref) in HBONES.items():
@@ -509,12 +577,21 @@ def bone_frames(f, prev=None):
                 limit = math.radians(MAX_TURN_DEG)
                 z = Matrix.Rotation(max(-limit, min(limit, angle)), 3, y) @ before
         bones[name] = (q[h], q[t], z)
-    return bones, {'fwd': refs['fwd'], 'z': {n: b[2] for n, b in bones.items()}}
+    state = {'fwd': refs['fwd'], 'z': {n: b[2] for n, b in bones.items()}, 'grip': {}}
+    for s, sign in (('L', 1), ('R', -1)):
+        grip = grip_amount(f, s, other)
+        if prev:
+            before = prev['grip'][s]
+            grip = before + max(-GRIP_SPEED, min(GRIP_SPEED, grip - before))
+        state['grip'][s] = grip
+        bones.update(_hand_bones(*bones['hand.' + s], s, sign, grip))
+    return bones, state
 
 
-def pose_humanoid(rig, f, prev=None):
-    """Poses a humanoid rig on a v1-11 fighter; returns the state for the next frame."""
-    bones, state = bone_frames(f, prev)
+def pose_humanoid(rig, f, prev=None, other=None):
+    """Poses a humanoid rig on a v1-11 fighter (`other`: the opponent's joints, for grips);
+    returns the state for the next frame."""
+    bones, state = bone_frames(f, prev, other)
     inv = rig.matrix_world.inverted()
     origin = to_bl((0, 0, 0))
     for name, (head, tail, z) in bones.items():
@@ -563,7 +640,8 @@ def bake_humanoids(technique_path, start_frame=1):
     for k, poses in enumerate(frames):
         frame = start_frame + k
         for fid, rig in rigs.items():
-            prev[fid] = pose_humanoid(rig, poses[fid], prev[fid])
+            other = poses['opponent' if fid == 'me' else 'me']
+            prev[fid] = pose_humanoid(rig, poses[fid], prev[fid], other)
             bpy.context.view_layer.update()
             for pb in rig.pose.bones:
                 pb.keyframe_insert('location', frame=frame)
