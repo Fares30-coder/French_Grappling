@@ -117,14 +117,13 @@ def check_transition(step_a, step_b):
                     if f1 == f2 and (s1 == s2 or shares_joint(s1, s2)):
                         continue
                     pairs.append((f1, s1, f2, s2))
+    # Interpolated once per sample, shared by every pair.
+    frames = [{f: interpolate_fighter(fa[f], fb[f], n / SAMPLES) for f in ids}
+              for n in range(SAMPLES + 1)]
     found = []
     for f1, s1, f2, s2 in pairs:
-        series = []
-        for n in range(SAMPLES + 1):
-            t = n / SAMPLES
-            g1 = interpolate_fighter(fa[f1], fb[f1], t)
-            g2 = interpolate_fighter(fa[f2], fb[f2], t)
-            series.append(seg_dist(g1[s1[0]], g1[s1[1]], g2[s2[0]], g2[s2[1]]))
+        series = [seg_dist(g[f1][s1[0]], g[f1][s1[1]], g[f2][s2[0]], g[f2][s2[1]])
+                  for g in frames]
         low = min(series)
         ends = min(series[0], series[-1])
         if low < THRESHOLD_CM and ends - low > CLEARANCE_CM:
