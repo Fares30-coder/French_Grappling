@@ -31,7 +31,7 @@ Garder **Three.js + React Three Fiber**. Faire évoluer le rendu en deux étapes
 
 Jamais dans `packages/shared`, `apps/api`, `tools/pose-kit`, ni dans une page ou un composant d'UI. Un nouvel enfant 3D de l'éditeur s'ajoute explicitement à la liste (ou on regroupe les deux fichiers dans `admin/editor/scene/` et on exempte ce dossier).
 
-**F2. Format de pose neutre.** Une pose ne contient que des **points en cm** dans le repère d'ADR 0002 (et l'indice de caméra position/cible). Jamais de quaternions, d'angles d'Euler propres à un moteur, de noms d'os d'un modèle, d'ids de mesh ou de chemins d'asset. Une orientation dont on aurait besoin s'exprime par un **point supplémentaire** (cf. étape 2), qui s'interpole linéairement et s'édite avec le même gizmo.
+**F2. Format de pose neutre.** Une pose ne contient que des **points en cm** dans le repère d'ADR 0002 (et l'indice de caméra position/cible). Jamais de quaternions, d'angles d'Euler propres à un moteur, de noms d'os d'un modèle, d'ids de mesh ou de chemins d'asset. Une orientation dont on aurait besoin s'exprime par un **point supplémentaire** (cf. étape 2), qui s'interpole comme les autres et s'édite avec le même gizmo.
 
 **F3. Contrat du viewer = seule interface.** Les pages ne connaissent que `TechniqueViewer` / `TechniqueSceneProps` et les types de `@tatamap/shared`. Les types du contrat ne référencent aucun type `three` / R3F. Action immédiate (petite, pour `dev`) : remplacer
 
@@ -195,3 +195,7 @@ Dans « Conventions » :
 2. `dev` : quand `CURRENT_SKELETON` changera, faire lire `content:import` avec `poseSchema` + `upgradePose` (noté ici pour ne pas l'oublier).
 3. Fares : choisir la source du modèle (CC0 existant ou sur mesure) au moment de l'étape 1, après les critères remplis.
 4. Spike étape 1 (une journée, ciseau, comparaison `pose:render`) une fois la phase 2 terminée.
+
+## Addendum (2026-11-02) : interpolation par os
+
+Entre deux étapes, `interpolatePose` ne déplace plus chaque articulation en ligne droite : la hanche va en ligne droite, puis chaque os (`BONE_CHAIN_V1_11`, de la hanche vers les extrémités) tourne sur un grand cercle et sa longueur varie linéairement. En ligne droite, un bras qui pivote raccourcissait jusqu'à 38 cm au milieu de la transition ; les membres gardent maintenant leur longueur. Le format de pose ne change pas (toujours des points en cm, F2). Les points ajoutés par `v2-21` devront avoir un parent dans la chaîne. Les scripts Blender (`tatamap_humanoid.py`, `transitions.py`) font le même calcul.

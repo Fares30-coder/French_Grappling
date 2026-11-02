@@ -19,7 +19,7 @@ Hands (palm, four fingers, thumb) and feet (heel, arch, five toes) are rigid, in
 shape. Body weights are computed here, not by Blender's automatic weights: each vertex follows
 the bones whose surface it is on, so a bent thigh or arm no longer drags the pelvis or the back.
 The animation follows the site: each step held DEFAULT_HOLD_MS, then a smoothstep transition
-of the next step's transitionMs, joints interpolated linearly.
+of the next step's transitionMs, bones turned as on the site (_interpolate_fighter).
 """
 
 import json
@@ -87,7 +87,7 @@ def _shoulder(nominal, elbow, fwd, up):
     """Shoulder point, moved like a shoulder blade so the upper arm is never crushed or overlong:
     away from an elbow that comes too close (depression), towards one that is far (protraction),
     and a little forward / up with the arm."""
-    # Mid-transition (joints interpolated linearly) the elbow can pass through the shoulder:
+    # Mid-transition the elbow can still pass close to the shoulder (bones turn around the neck):
     # every shift fades out as it gets close, so the shoulder never jumps.
     near = min(1.0, (elbow - nominal).length / 8)
     reach = (elbow - nominal).normalized() * near
@@ -615,8 +615,47 @@ def _smoothstep(t):
     return t * t * (3 - 2 * t)
 
 
-def _lerp_fighter(a, b, t):
-    return {j: [a[j][i] + (b[j][i] - a[j][i]) * t for i in range(3)] for j in a}
+# Same as apps/web/src/features/viewer/interpolate.ts: the hip moves in a straight line, each
+# bone turns along a great circle and changes length linearly, so limbs keep their length.
+BONE_CHAIN = [
+    ('hip', 'neck'), ('neck', 'head'),
+    ('neck', 'elbowL'), ('elbowL', 'handL'), ('neck', 'elbowR'), ('elbowR', 'handR'),
+    ('hip', 'kneeL'), ('kneeL', 'footL'), ('hip', 'kneeR'), ('kneeR', 'footR'),
+]
+
+
+def _slerp_unit(a, b, t, eps=1e-6):
+    angle = math.acos(max(-1.0, min(1.0, sum(x * y for x, y in zip(a, b)))))
+    if angle < eps:
+        return a
+    if angle > math.pi - eps:
+        # Opposite directions: turn through a fixed perpendicular (as the viewer does).
+        helper = (0, 1, 0) if abs(a[1]) < 0.9 else (1, 0, 0)
+        axis = (a[1] * helper[2] - a[2] * helper[1], a[2] * helper[0] - a[0] * helper[2],
+                a[0] * helper[1] - a[1] * helper[0])
+        n = math.hypot(*axis)
+        perp = [(axis[1] * a[2] - axis[2] * a[1]) / n, (axis[2] * a[0] - axis[0] * a[2]) / n,
+                (axis[0] * a[1] - axis[1] * a[0]) / n]
+        c, s = math.cos(math.pi * t), math.sin(math.pi * t)
+        return [a[i] * c + perp[i] * s for i in range(3)]
+    s = math.sin(angle)
+    ka, kb = math.sin((1 - t) * angle) / s, math.sin(t * angle) / s
+    return [a[i] * ka + b[i] * kb for i in range(3)]
+
+
+def _interpolate_fighter(a, b, t):
+    out = {'hip': [a['hip'][i] + (b['hip'][i] - a['hip'][i]) * t for i in range(3)]}
+    for parent, child in BONE_CHAIN:
+        da = [a[child][i] - a[parent][i] for i in range(3)]
+        db = [b[child][i] - b[parent][i] for i in range(3)]
+        la, lb = math.hypot(*da), math.hypot(*db)
+        if la == 0 or lb == 0:
+            off = [da[i] + (db[i] - da[i]) * t for i in range(3)]
+        else:
+            u = _slerp_unit([x / la for x in da], [x / lb for x in db], t)
+            off = [x * (la + (lb - la) * t) for x in u]
+        out[child] = [out[parent][i] + off[i] for i in range(3)]
+    return out
 
 
 def site_timeline(technique):
@@ -632,7 +671,7 @@ def site_timeline(technique):
             n = max(1, round(steps[i + 1]['transitionMs'] / 1000 * FPS))
             for k in range(1, n + 1):
                 t = _smoothstep(k / n)
-                frames.append({fid: _lerp_fighter(here[fid], nxt[fid], t) for fid in here})
+                frames.append({fid: _interpolate_fighter(here[fid], nxt[fid], t) for fid in here})
     return frames
 
 
