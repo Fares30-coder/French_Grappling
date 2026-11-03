@@ -83,8 +83,10 @@ function bendDir(root: Vector3, mid: Vector3, end: Vector3, straight: Vector3, f
   return d.length() > 1e-6 ? d.normalize() : straight.clone();
 }
 
-const UPPER_ARM_CM = [21, 36] as const;
-const SHOULDER_SHIFT_CM = 7;
+// Shoulder -> elbow kept in this range: v1-11 measures the arm from the neck (35 cm), so a raised
+// arm left 18-22 cm from the shoulder (21 was allowed) and the shoulder looked crushed.
+const UPPER_ARM_CM = [27, 34] as const;
+const SHOULDER_SHIFT_CM = 10;
 const DELTOID_CM = 8;
 
 /** Shoulder point, moved like a shoulder blade so the upper arm is never crushed or overlong. */

@@ -83,8 +83,10 @@ def _bend_dir(root, mid, end, straight_dir, fade_cm=6):
 
 
 DELTOID_CM = 8
-UPPER_ARM_CM = (21, 36)  # shoulder -> elbow kept in this range (v1-11 measures from the neck)
-SHOULDER_SHIFT_CM = 7
+# Shoulder -> elbow kept in this range: v1-11 measures the arm from the neck (35 cm), so a raised
+# arm left 18-22 cm from the shoulder (21 was allowed) and the shoulder looked crushed.
+UPPER_ARM_CM = (27, 34)
+SHOULDER_SHIFT_CM = 10
 
 
 def _shoulder(nominal, elbow, fwd, up):
