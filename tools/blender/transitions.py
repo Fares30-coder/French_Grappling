@@ -97,7 +97,9 @@ def interpolate_fighter(a, b, t):
         else:
             u = _slerp_unit([x / la for x in da], [x / lb for x in db], t)
             off = [x * (la + (lb - la) * t) for x in u]
-        out[child] = [out[parent][i] + off[i] for i in range(3)]
+        joint = [out[parent][i] + off[i] for i in range(3)]
+        joint[1] = max(joint[1], min(a[child][1], b[child][1]))  # never through the mat
+        out[child] = joint
     return out
 
 
