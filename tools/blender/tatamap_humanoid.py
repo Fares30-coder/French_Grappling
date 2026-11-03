@@ -12,7 +12,8 @@ derived per frame (ADR 0004's problem, solved here only for rendering):
 - up = hip -> neck; forward = the thighs' direction across the spine (knees are in front of the
   body in nearly every grappling pose); left = up x forward, as in `mirroredFighters`.
 - shoulders = neck +/- 17 cm sideways, 5 cm down; hip joints = hip +/- 9 cm, 5 cm down;
-  wrist 7 cm before the hand point; toes along the forward direction, across the shin.
+  wrist 7 cm before the hand point; toes the way the kneecap points (forward when the leg is
+  straight), across the shin.
 - limb twist: arms turn with the direction the elbow points to, legs with the knee's; the thumb
   is opposite the elbow point, the top of the foot faces the knee.
 Hands (palm, four fingers, thumb) and feet (heel, arch, five toes) are rigid, in a relaxed
@@ -133,14 +134,17 @@ def derived_points(f, prev_forward=None):
         q['hipj' + s] = hip + left * (9 * sign) - up * 5
         q['knee' + s] = p['knee' + s]
         q['ankle' + s] = p['foot' + s]
+        # The foot points like the kneecap (the torso's forward when the leg is straight): taken
+        # from the torso, it spun round the shin whenever the derived facing turned.
+        knee = _bend_dir(q['hipj' + s], q['knee' + s], q['ankle' + s], fwd)
         shin = (p['foot' + s] - p['knee' + s]).normalized()
-        foot_dir = fwd - shin * fwd.dot(shin)
+        foot_dir = knee - shin * knee.dot(shin)
         foot_dir = foot_dir.normalized() if foot_dir.length > 1e-3 else fwd
         q['toe' + s] = p['foot' + s] + foot_dir * 15
         elbow = _bend_dir(q['shoulder' + s], q['elbow' + s], q['wrist' + s], -fwd)
         refs['elbow' + s] = elbow
         refs['thumb' + s] = -elbow
-        refs['knee' + s] = _bend_dir(q['hipj' + s], q['knee' + s], q['ankle' + s], fwd)
+        refs['knee' + s] = knee
         refs['foot_top' + s] = q['knee' + s] - q['ankle' + s]
         refs['arm_swing' + s] = _swing_ref(q['elbow' + s] - q['shoulder' + s], up, fwd, left)
         refs['leg_swing' + s] = _swing_ref(q['knee' + s] - q['hipj' + s], up, fwd, left)

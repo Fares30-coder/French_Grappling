@@ -163,14 +163,17 @@ export function derivedPoints(
     q[`hipj${s}`] = hipj;
     q[`knee${s}`] = knee;
     q[`ankle${s}`] = foot;
+    // The foot points like the kneecap (the torso's forward when the leg is straight): taken from
+    // the torso, it spun round the shin whenever the derived facing turned.
+    const kneeDir = bendDir(hipj, knee, foot, fwd);
     const shin = unit(foot.clone().sub(knee));
-    let footDir = fwd.clone().sub(shin.clone().multiplyScalar(fwd.dot(shin)));
+    let footDir = kneeDir.clone().sub(shin.clone().multiplyScalar(kneeDir.dot(shin)));
     footDir = footDir.length() > 1e-3 ? footDir.normalize() : fwd.clone();
     q[`toe${s}`] = foot.clone().add(footDir.multiplyScalar(15));
     const elbowDir = bendDir(shoulderPt, elbow, wrist, fwd.clone().multiplyScalar(-1));
     refs[`elbow${s}`] = elbowDir;
     refs[`thumb${s}`] = elbowDir.clone().multiplyScalar(-1);
-    refs[`knee${s}`] = bendDir(hipj, knee, foot, fwd);
+    refs[`knee${s}`] = kneeDir;
     refs[`foot_top${s}`] = knee.clone().sub(foot);
     refs[`arm_swing${s}`] = swingRef(elbow.clone().sub(shoulderPt), up, fwd, left);
     refs[`leg_swing${s}`] = swingRef(knee.clone().sub(hipj), up, fwd, left);

@@ -7,7 +7,6 @@ import {
 } from '@tatamap/shared';
 import { type Ref, useImperativeHandle, useLayoutEffect, useMemo, useRef } from 'react';
 import {
-  type Bone,
   Group,
   Matrix4,
   MeshStandardMaterial,
@@ -16,6 +15,7 @@ import {
   Vector3,
 } from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { applyDualQuaternionSkinning, createBoneTexture, writeBone } from './dq-skinning';
 import { type BoneFrame, boneAxes, boneFrames, type RigState } from './rig';
 
 /** The humanoid model (tools/blender/export_site_model.py), versioned so the PWA cache moves on. */
@@ -76,18 +76,19 @@ function frameMatrix(frame: BoneFrame, scaleY: number, out: Matrix4): Matrix4 {
 }
 
 type Driven = {
-  bone: Bone;
+  /** Index of the bone in the skin (the shader's bone texture row). */
+  index: number;
   /** Rest length of the bone (cm). */
   length: number;
-  /** inverse(parent world) and rest(frame)^-1 * rest(world), fixed at load. */
-  parentInverse: Matrix4;
-  fromRest: Matrix4;
+  rest: Matrix4;
+  restInverse: Matrix4;
 };
 
 /**
- * One fighter's skinned body. Each bone is placed like `pose_humanoid` does in Blender: the skin
- * moves by frame(now) * frame(rest)^-1, in Tatamap cm. The glTF's axis conventions cancel out,
- * since the rest world matrices are measured on the loaded model.
+ * One fighter's skinned body, skinned like Blender's videos (dual quaternions, see
+ * dq-skinning.ts). Each bone moves the skin by frame(now) * frame(rest)^-1 in Tatamap cm, as
+ * `pose_humanoid` does in Blender; that transform is carried into the mesh's own space, so the
+ * glTF's axis conventions do not matter.
  */
 function buildBody(scene: Object3D, rest: Rest, color: string, translucent: boolean) {
   const root = new Group();
@@ -99,41 +100,49 @@ function buildBody(scene: Object3D, rest: Rest, color: string, translucent: bool
     roughness: 0.55,
     ...(translucent ? { transparent: true, opacity: TRANSLUCENT_OPACITY, depthWrite: false } : {}),
   });
+  let mesh: SkinnedMesh | null = null;
   model.traverse((o) => {
-    if ((o as SkinnedMesh).isSkinnedMesh) {
-      const mesh = o as SkinnedMesh;
-      mesh.material = material;
-      mesh.frustumCulled = false; // the bounding sphere is the rest pose's
-      if (translucent) mesh.raycast = () => {};
-    }
+    if ((o as SkinnedMesh).isSkinnedMesh) mesh = o as SkinnedMesh;
   });
+  const skin = mesh as SkinnedMesh | null;
+  if (!skin) throw new Error(`${BODY_MODEL_URL}: no skinned mesh`);
+  skin.material = material;
+  skin.frustumCulled = false; // the bounding sphere is the rest pose's
+  skin.raycast = () => {}; // never picked; three's CPU skinning would not match the shader
   root.updateMatrixWorld(true);
-  // Loaded bone name -> the bone and its rest.
+  const meshToWorld = skin.matrixWorld.clone();
+  const worldToMesh = meshToWorld.clone().invert();
+  const texture = createBoneTexture(skin.skeleton.bones.length);
+  applyDualQuaternionSkinning(material, texture);
+
+  // Loaded bone name -> its index in the skin and its rest frame.
   const driven = new Map<string, Driven>();
-  const restMatrix = new Matrix4();
   const restByNode = new Map(Object.entries(rest).map(([name, frame]) => [nodeName(name), frame]));
-  model.traverse((o) => {
-    const bone = o as Bone;
-    const frame = bone.isBone ? restByNode.get(bone.name) : undefined;
-    if (!frame || !bone.parent) return;
+  skin.skeleton.bones.forEach((bone, index) => {
+    const frame = restByNode.get(bone.name);
+    if (!frame) return;
     const [head, tail, z] = frame.map((p) => new Vector3(p[0], p[1], p[2])) as [
       Vector3,
       Vector3,
       Vector3,
     ];
-    frameMatrix({ head, tail, z }, 1, restMatrix);
+    const restMatrix = frameMatrix({ head, tail, z }, 1, new Matrix4());
     driven.set(bone.name, {
-      bone,
+      index,
       length: head.distanceTo(tail),
-      parentInverse: bone.parent.matrixWorld.clone().invert(),
-      fromRest: restMatrix.clone().invert().multiply(bone.matrixWorld),
+      rest: restMatrix,
+      restInverse: restMatrix.clone().invert(),
     });
-    bone.matrixAutoUpdate = false;
   });
   const missing = Object.keys(rest).filter((name) => !driven.has(nodeName(name)));
   if (missing.length > 0)
     throw new Error(`${BODY_MODEL_URL}: bones not found: ${missing.join(', ')}`);
-  return { root, driven, material };
+  // Bones left out of the rest frames (none today) keep the rest pose.
+  const identity = new Matrix4();
+  skin.skeleton.bones.forEach((_bone, index) => {
+    writeBone(texture.image.data as Float32Array, index, identity, identity);
+  });
+  return { root, driven, material, texture, meshToWorld, worldToMesh };
 }
 
 export function BodyMesh({ fighter, ref, translucent = false, initialPose, onReady }: Props) {
@@ -144,10 +153,16 @@ export function BodyMesh({ fighter, ref, translucent = false, initialPose, onRea
     () => buildBody(gltf.scene, rest, FIGHTER_COLORS[fighter], translucent),
     [gltf.scene, rest, fighter, translucent],
   );
-  useLayoutEffect(() => () => body.material.dispose(), [body]);
+  useLayoutEffect(
+    () => () => {
+      body.material.dispose();
+      body.texture.dispose();
+    },
+    [body],
+  );
 
   const prevRef = useRef<{ state: RigState; at: number } | null>(null);
-  const scratch = useMemo(() => new Matrix4(), []);
+  const scratch = useMemo(() => ({ rigid: new Matrix4(), stretch: new Matrix4() }), []);
 
   const handle: BodyMeshHandle = useMemo(
     () => ({
@@ -163,13 +178,21 @@ export function BodyMesh({ fighter, ref, translucent = false, initialPose, onRea
           dtSeconds: prev ? dt : 0,
         });
         prevRef.current = { state, at: now };
+        const data = body.texture.image.data as Float32Array;
+        const { rigid, stretch } = scratch;
         for (const [name, frame] of bones) {
           const d = body.driven.get(nodeName(name));
           if (!d) continue;
-          frameMatrix(frame, frame.head.distanceTo(frame.tail) / d.length, scratch);
-          d.bone.matrix.copy(d.parentInverse).multiply(scratch).multiply(d.fromRest);
-          d.bone.matrixWorldNeedsUpdate = true;
+          // frame(now) * stretch * frame(rest)^-1 = rigid * (frame(rest) * stretch * frame(rest)^-1)
+          frameMatrix(frame, 1, rigid).multiply(d.restInverse);
+          stretch.makeScale(1, frame.head.distanceTo(frame.tail) / d.length, 1);
+          stretch.premultiply(d.rest).multiply(d.restInverse);
+          // Into the mesh's space: M^-1 * T * M.
+          rigid.premultiply(body.worldToMesh).multiply(body.meshToWorld);
+          stretch.premultiply(body.worldToMesh).multiply(body.meshToWorld);
+          writeBone(data, d.index, rigid, stretch);
         }
+        body.texture.needsUpdate = true;
       },
     }),
     [body, scratch],
