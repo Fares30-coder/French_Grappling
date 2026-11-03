@@ -1,5 +1,6 @@
-import { boneLengths, type FighterPoseV1_11, handednessScore } from '@tatamap/shared';
+import { boneLengths, type FighterPoseV1_11, handednessScore, type Vec3 } from '@tatamap/shared';
 import { describe, expect, it } from 'vitest';
+import { bentNecks } from './analyze';
 import {
   buildFighter,
   type FighterSpec,
@@ -108,5 +109,15 @@ describe('separateTechnique guard', () => {
     const out = separateBodies(makePose(me, facing(5)), { maxMoveCm: 60 });
     expect(handednessScore(out.fighters.me)).toBeGreaterThan(-15);
     expect(handednessScore(out.fighters.opponent)).toBeGreaterThan(-15);
+  });
+});
+
+describe('bentNecks', () => {
+  it('flags a head bent past 60 degrees from the spine, not an upright one', () => {
+    expect(bentNecks(makePose(me, translateFighter(me, [0, 0, 300])))).toEqual([]);
+    const tucked = { ...me, head: [me.neck[0] + 20, me.neck[1] - 8, me.neck[2]] as Vec3 };
+    expect(
+      bentNecks(makePose(tucked, translateFighter(me, [0, 0, 300]))).map((n) => n.fighter),
+    ).toEqual(['me']);
   });
 });

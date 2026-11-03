@@ -174,3 +174,20 @@ export function poseCenter(pose: CurrentPose): Vec3 {
   }
   return [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2];
 }
+
+/** A head bent further than this from the spine line (hip -> neck) is past what a neck does. */
+export const MAX_HEAD_BEND_DEG = 60;
+
+/** Fighters whose head is bent more than MAX_HEAD_BEND_DEG from their spine line. */
+export function bentNecks(pose: CurrentPose): Array<{ fighter: FighterId; degrees: number }> {
+  const out: Array<{ fighter: FighterId; degrees: number }> = [];
+  for (const fighter of FIGHTERS) {
+    const f = pose.fighters[fighter];
+    const spine = sub(f.neck, f.hip);
+    const head = sub(f.head, f.neck);
+    const cos = dot(spine, head) / (length(spine) * length(head) || 1);
+    const degrees = (Math.acos(Math.min(1, Math.max(-1, cos))) * 180) / Math.PI;
+    if (degrees > MAX_HEAD_BEND_DEG) out.push({ fighter, degrees });
+  }
+  return out;
+}

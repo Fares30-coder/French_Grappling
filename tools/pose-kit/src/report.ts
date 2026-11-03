@@ -4,7 +4,7 @@ import {
   mirroredFighters,
   standardBodyWarnings,
 } from '@tatamap/shared';
-import { findContacts, jointsBelowMat } from './analyze';
+import { bentNecks, findContacts, jointsBelowMat, MAX_HEAD_BEND_DEG } from './analyze';
 import { bodyPenetrations, transitionPenetration } from './volume';
 
 export type StepReport = {
@@ -13,6 +13,7 @@ export type StepReport = {
   boneWarnings: string[];
   mirrored: string[];
   underMat: string[];
+  necks: string[];
   contacts: string[];
   /** Body parts sunk into each other, with the mannequin's volume. */
   volume: string[];
@@ -45,6 +46,10 @@ export function reportTechnique(technique: ContentTechnique): StepReport[] {
             : `sinks into the mat (partly hidden, keep >= ${j.joint === 'head' ? 14 : 6} cm)`
         }`,
     ),
+    necks: bentNecks(step.pose).map(
+      (n) =>
+        `${n.fighter}: head bent ${n.degrees.toFixed(0)}° from the spine (keep <= ${MAX_HEAD_BEND_DEG}°)`,
+    ),
     contacts: findContacts(step.pose).map(
       (c) => `${c.between}: ${cm(c.distanceCm)} (< ${c.thresholdCm} cm)`,
     ),
@@ -65,6 +70,7 @@ export function formatReport(technique: ContentTechnique, reports: StepReport[])
       ...r.boneWarnings,
       ...r.mirrored,
       ...r.underMat,
+      ...r.necks,
       ...r.contacts,
       ...r.volume,
       ...r.toNext,
@@ -73,6 +79,7 @@ export function formatReport(technique: ContentTechnique, reports: StepReport[])
     for (const w of r.boneWarnings) lines.push(`  bone length  ${w}`);
     for (const w of r.mirrored) lines.push(`  mirrored     ${w}`);
     for (const w of r.underMat) lines.push(`  mat          ${w}`);
+    for (const w of r.necks) lines.push(`  neck         ${w}`);
     for (const w of r.contacts) lines.push(`  overlap?     ${w}`);
     for (const w of r.volume) lines.push(`  sinks in     ${w}`);
     for (const w of r.toNext) lines.push(`  to next      ${w}`);
@@ -87,6 +94,7 @@ export const countIssues = (reports: StepReport[]): number =>
       r.boneWarnings.length +
       r.mirrored.length +
       r.underMat.length +
+      r.necks.length +
       r.contacts.length +
       r.volume.length +
       r.toNext.length,
