@@ -40,7 +40,9 @@ def _v(p):
     return Vector(p)
 
 
-MAX_TURN_DEG = 15  # per frame (30 fps): a pop in the derived facing or roll becomes a quick turn
+# Per frame (30 fps): only a pop in the derived facing or a roll becomes a quick turn. Slower
+# (it was 15) and a limb moving at a normal speed lagged behind its pose, twisted, for many frames.
+MAX_TURN_DEG = 60
 
 
 def _turn_towards(a, b, max_deg):

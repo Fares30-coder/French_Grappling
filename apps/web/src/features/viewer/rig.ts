@@ -24,8 +24,12 @@ export type RigState = {
   hand: { L: number; R: number };
 };
 
-/** Fastest turn of the derived facing and rolls (the videos: 15 degrees a frame at 30 fps). */
-export const MAX_TURN_DEG_PER_S = 450;
+/**
+ * Fastest turn of the derived facing and rolls (the videos: 60 degrees a frame at 30 fps). It
+ * only smooths pops: at 450 a limb moving at a normal speed lagged behind its pose, twisted, for
+ * dozens of frames (up to 177 degrees behind).
+ */
+export const MAX_TURN_DEG_PER_S = 1800;
 /** Fastest change of a hand shape (-1 flat .. 1 fist; the videos: 0.12 a frame at 30 fps). */
 export const GRIP_SPEED_PER_S = 3.6;
 

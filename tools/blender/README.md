@@ -46,7 +46,8 @@ to the bones, scaled by the part's radius, so a bent thigh or arm does not drag 
 Upper arms and thighs have a twist bone (the twist spreads along the limb instead of pinching
 the shoulder or the hip), a deltoid bone halfway between the clavicle and the upper arm rounds the
 shoulder over a raised arm, the skin keeps its volume at the joints (dual quaternions), and the
-derived rolls and facing turn at most 15 degrees per frame, so they never pop.
+derived rolls and facing turn at most 60 degrees per frame, so they never pop (slower, a limb
+moving at a normal speed lagged behind its pose).
 Each finger has three phalanx bones and the thumb three. A hand follows the pose's `hands`
 (`grip`: fist, `push`: flat, `free`: relaxed; set in the editor, ADR 0002 addendum). A hand left
 out is automatic: it closes when its point is within 3 cm of the opponent's body (or of the
