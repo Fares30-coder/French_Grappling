@@ -101,3 +101,12 @@ describe('separateBodies', () => {
     expect(outA && outB && transitionPenetration(outA, outB)).toBeNull();
   });
 });
+
+describe('separateTechnique guard', () => {
+  it('never leaves a fighter a mirror image of itself', () => {
+    // Bodies deep in each other: whatever the push, no fighter may come out mirrored.
+    const out = separateBodies(makePose(me, facing(5)), { maxMoveCm: 60 });
+    expect(handednessScore(out.fighters.me)).toBeGreaterThan(-15);
+    expect(handednessScore(out.fighters.opponent)).toBeGreaterThan(-15);
+  });
+});
