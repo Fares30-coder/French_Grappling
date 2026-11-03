@@ -16,3 +16,9 @@ coverage
 
 # Python
 __pycache__/
+
+# Reference videos of techniques belong in the private content repo (content/references/)
+*.mp4
+*.mov
+*.m4v
+*.webm

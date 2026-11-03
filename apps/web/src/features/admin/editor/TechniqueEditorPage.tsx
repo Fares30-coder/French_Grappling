@@ -39,6 +39,7 @@ import { JointPanel } from './JointPanel';
 import { MetaForm } from './MetaForm';
 import { PoseTools } from './PoseTools';
 import { PreviewDialog } from './PreviewDialog';
+import { ReferenceVideo } from './ReferenceVideo';
 import { StepsPanel } from './StepsPanel';
 import { TagsPicker } from './TagsPicker';
 import { toPreview } from './to-preview';
@@ -316,31 +317,35 @@ function TechniqueEditor({
 
       <div className="mt-4 grid gap-6 lg:grid-cols-2">
         <div>
-          <TechniqueViewer
-            className="aspect-video w-full overflow-hidden rounded-lg"
-            steps={state.technique.steps}
-            stepIndex={state.stepIndex}
-            playing={playing}
-            onStepChange={(index) => rawDispatch({ type: 'selectStep', index })}
-            ghostPose={
-              ghost && !playing ? (state.technique.steps[state.stepIndex - 1]?.pose ?? null) : null
-            }
-            view={view}
-            cameraKey={cameraKey}
-            selectedJoint={selectedJoint}
-            onJointPointerDown={(joint) => dispatch({ type: 'selectJoint', joint })}
-          >
-            {!playing && selectedJoint && selectedPosition && (
-              <JointGizmo
-                position={selectedPosition}
-                view={view}
-                onBegin={() => dispatch({ type: 'beginJointDrag' })}
-                onMove={moveSelected}
-                onEnd={() => dispatch({ type: 'endJointDrag' })}
-              />
-            )}
-            <CameraCapture captureRef={captureRef} />
-          </TechniqueViewer>
+          <ReferenceVideo techniqueId={loaded.id} stepIndex={state.stepIndex}>
+            <TechniqueViewer
+              className="aspect-video w-full overflow-hidden rounded-lg"
+              steps={state.technique.steps}
+              stepIndex={state.stepIndex}
+              playing={playing}
+              onStepChange={(index) => rawDispatch({ type: 'selectStep', index })}
+              ghostPose={
+                ghost && !playing
+                  ? (state.technique.steps[state.stepIndex - 1]?.pose ?? null)
+                  : null
+              }
+              view={view}
+              cameraKey={cameraKey}
+              selectedJoint={selectedJoint}
+              onJointPointerDown={(joint) => dispatch({ type: 'selectJoint', joint })}
+            >
+              {!playing && selectedJoint && selectedPosition && (
+                <JointGizmo
+                  position={selectedPosition}
+                  view={view}
+                  onBegin={() => dispatch({ type: 'beginJointDrag' })}
+                  onMove={moveSelected}
+                  onEnd={() => dispatch({ type: 'endJointDrag' })}
+                />
+              )}
+              <CameraCapture captureRef={captureRef} />
+            </TechniqueViewer>
+          </ReferenceVideo>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <fieldset className="flex gap-1">
               <legend className="sr-only">Vue</legend>
