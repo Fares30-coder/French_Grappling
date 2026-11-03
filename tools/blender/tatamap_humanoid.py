@@ -105,11 +105,19 @@ def _shoulder(nominal, elbow, fwd, up):
     return s + (elbow - s).normalized() * shift
 
 
-def _swing_ref(direction, up, fwd, left):
-    """Roll of a limb's top half that only swings from "pointing forward", with no twist
+# No-twist references, in the torso frame (left, up, forward): (limb direction, roll there).
+# Arms swing from hanging down, elbow behind: raising one forward or out to the side does not
+# twist it (from "pointing forward", an arm out to the side counted as a 90 degree twist and the
+# skin wrung the upper arm). Legs swing from pointing forward, the knee up (sitting).
+ARM_SWING_REST = ((0, -1, 0), (0, 0, 1))
+LEG_SWING_REST = ((0, 0, 1), (0, 1, 0))
+
+
+def _swing_ref(direction, up, fwd, left, rest):
+    """Roll of a limb's top half that only swings from its rest direction, with no twist
     against the torso: the twist (elbow or knee direction) is taken by the bottom half."""
     local = Vector((direction.dot(left), direction.dot(up), direction.dot(fwd))).normalized()
-    z = Vector((0, 0, 1)).rotation_difference(local) @ Vector((0, 1, 0))
+    z = Vector(rest[0]).rotation_difference(local) @ Vector(rest[1])
     return left * z.x + up * z.y + fwd * z.z
 
 
@@ -150,8 +158,10 @@ def derived_points(f, prev_forward=None):
         refs['thumb' + s] = -elbow
         refs['knee' + s] = knee
         refs['foot_top' + s] = q['knee' + s] - q['ankle' + s]
-        refs['arm_swing' + s] = _swing_ref(q['elbow' + s] - q['shoulder' + s], up, fwd, left)
-        refs['leg_swing' + s] = _swing_ref(q['knee' + s] - q['hipj' + s], up, fwd, left)
+        refs['arm_swing' + s] = _swing_ref(q['elbow' + s] - q['shoulder' + s], up, fwd, left,
+                                            ARM_SWING_REST)
+        refs['leg_swing' + s] = _swing_ref(q['knee' + s] - q['hipj' + s], up, fwd, left,
+                                            LEG_SWING_REST)
     return q, refs
 
 

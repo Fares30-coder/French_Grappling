@@ -107,11 +107,26 @@ function shoulder(nominal: Vector3, elbow: Vector3, fwd: Vector3, up: Vector3): 
   return s.clone().add(unit(elbow.clone().sub(s)).multiplyScalar(shift));
 }
 
-/** Roll of a limb's top half that only swings from "pointing forward", with no twist. */
-function swingRef(direction: Vector3, up: Vector3, fwd: Vector3, left: Vector3): Vector3 {
+/**
+ * No-twist references, in the torso frame (left, up, forward): [limb direction, roll there].
+ * Arms swing from hanging down, elbow behind: raising one forward or out to the side does not
+ * twist it (from "pointing forward", an arm out to the side counted as a 90 degree twist and the
+ * skin wrung the upper arm). Legs swing from pointing forward, the knee up (sitting).
+ */
+const ARM_SWING_REST = [new Vector3(0, -1, 0), new Vector3(0, 0, 1)] as const;
+const LEG_SWING_REST = [new Vector3(0, 0, 1), new Vector3(0, 1, 0)] as const;
+
+/** Roll of a limb's top half that only swings from its rest direction, with no twist. */
+function swingRef(
+  direction: Vector3,
+  up: Vector3,
+  fwd: Vector3,
+  left: Vector3,
+  [restDirection, restRoll]: readonly [Vector3, Vector3],
+): Vector3 {
   const local = new Vector3(direction.dot(left), direction.dot(up), direction.dot(fwd)).normalize();
-  const turn = new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), local);
-  const z = new Vector3(0, 1, 0).applyQuaternion(turn);
+  const turn = new Quaternion().setFromUnitVectors(restDirection, local);
+  const z = restRoll.clone().applyQuaternion(turn);
   return left
     .clone()
     .multiplyScalar(z.x)
@@ -181,8 +196,8 @@ export function derivedPoints(
     refs[`thumb${s}`] = elbowDir.clone().multiplyScalar(-1);
     refs[`knee${s}`] = kneeDir;
     refs[`foot_top${s}`] = knee.clone().sub(foot);
-    refs[`arm_swing${s}`] = swingRef(elbow.clone().sub(shoulderPt), up, fwd, left);
-    refs[`leg_swing${s}`] = swingRef(knee.clone().sub(hipj), up, fwd, left);
+    refs[`arm_swing${s}`] = swingRef(elbow.clone().sub(shoulderPt), up, fwd, left, ARM_SWING_REST);
+    refs[`leg_swing${s}`] = swingRef(knee.clone().sub(hipj), up, fwd, left, LEG_SWING_REST);
   }
   return { q, refs };
 }
