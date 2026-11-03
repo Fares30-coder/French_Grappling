@@ -3,14 +3,15 @@ import {
   type CurrentPose,
   FIGHTERS,
   type FighterId,
+  type FighterPoseV1_11,
   HEAD_RADIUS_CM,
   JOINTS_V1_11,
   type JointV1_11,
   mirroredFighters,
   type Vec3,
 } from '@tatamap/shared';
-import { closestPoints, JOINT_RADIUS_CM } from './analyze';
-import { add, distance, scale, sub, unit } from './vec';
+import { closestPoints, JOINT_RADIUS_CM, MAX_HEAD_BEND_DEG } from './analyze';
+import { add, distance, dot, scale, sub, unit } from './vec';
 import {
   bodyPenetrations,
   type CapsuleEnd,
@@ -52,7 +53,8 @@ export const MAX_MOVE_CM = 15;
  *
  * A limb that goes from one side of another to the other side between two steps cannot be fixed
  * by moving the steps: it needs a step in between, and stays reported. A fighter that would end
- * up a mirror image of itself (mirroredFighters) keeps its original pose in that step.
+ * up a mirror image of itself (mirroredFighters) keeps its original pose in that step, and a head
+ * pushed past what a neck bends is brought back (bentNecks).
  */
 export function separateTechnique(
   poses: readonly CurrentPose[],
@@ -169,8 +171,26 @@ export function separateTechnique(
     for (const f of mirroredFighters(after)) {
       if (!wasMirrored.has(f)) after.fighters[f] = clone(before.fighters[f]);
     }
+    // Pushes on the head can fold it on the neck (and an original pose may already be): bring it
+    // back within what a neck does.
+    for (const f of FIGHTERS) after.fighters[f].head = unbendHead(after.fighters[f]);
     return after;
   });
+}
+
+/** The head turned towards the spine line, in their plane, to at most MAX_HEAD_BEND_DEG - 2. */
+function unbendHead(f: FighterPoseV1_11): Vec3 {
+  const spine = unit(sub(f.neck, f.hip));
+  const head = sub(f.head, f.neck);
+  const length = distance(f.head, f.neck);
+  const along = unit(head);
+  const angle = Math.acos(Math.min(1, Math.max(-1, dot(spine, along))));
+  const limit = ((MAX_HEAD_BEND_DEG - 2) * Math.PI) / 180;
+  if (angle <= limit + (2 * Math.PI) / 180) return f.head;
+  const across = unit(sub(along, scale(spine, Math.cos(angle))));
+  const direction = add(scale(spine, Math.cos(limit)), scale(across, Math.sin(limit)));
+  const p = add(f.neck, scale(direction, length));
+  return [r1(p[0]), r1(p[1]), r1(p[2])];
 }
 
 /** One pose on its own: see separateTechnique. */
