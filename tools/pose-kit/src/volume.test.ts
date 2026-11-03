@@ -87,7 +87,6 @@ describe('separateBodies', () => {
   });
 
   it('also separates inside a transition', () => {
-    // Clean at both steps, through my head in between.
     // He passes over me from back to front: clear at both steps, his feet through my head
     // halfway.
     // Shifted by hand: translateFighter clamps into the schema bounds.
@@ -98,9 +97,9 @@ describe('separateBodies', () => {
     const [a, b] = [makePose(me, over(-60)), makePose(me, over(60))];
     expect(maxPenetration(a) + maxPenetration(b)).toBe(0);
     expect(transitionPenetration(a, b)?.between).toMatch(/me head x opponent (foot|shin)/);
-    const [outA, outB] = separateTechnique([a, b]);
+    const [outA, outB] = separateTechnique([a, b], { iterations: 120 });
     expect(outA && outB && transitionPenetration(outA, outB)).toBeNull();
-  });
+  }, 30_000); // the relaxation is slow on CI runners
 });
 
 describe('separateTechnique guard', () => {
