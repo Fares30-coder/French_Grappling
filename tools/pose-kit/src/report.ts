@@ -5,6 +5,7 @@ import {
   standardBodyWarnings,
 } from '@tatamap/shared';
 import { findContacts, jointsBelowMat } from './analyze';
+import { bodyPenetrations, transitionPenetration } from './volume';
 
 export type StepReport = {
   index: number;
@@ -13,6 +14,10 @@ export type StepReport = {
   mirrored: string[];
   underMat: string[];
   contacts: string[];
+  /** Body parts sunk into each other, with the mannequin's volume. */
+  volume: string[];
+  /** The same inside the transition to the next step (deepest point only). */
+  toNext: string[];
 };
 
 const cm = (n: number) => `${n.toFixed(1)} cm`;
@@ -43,24 +48,47 @@ export function reportTechnique(technique: ContentTechnique): StepReport[] {
     contacts: findContacts(step.pose).map(
       (c) => `${c.between}: ${cm(c.distanceCm)} (< ${c.thresholdCm} cm)`,
     ),
+    volume: bodyPenetrations(step.pose).map((p) => `${p.between}: ${cm(p.depthCm)} deep`),
+    toNext: ((next) => {
+      const hit = next && transitionPenetration(step.pose, next.pose);
+      return hit
+        ? [`${hit.between}: ${cm(hit.depthCm)} deep at ${Math.round(hit.at * 100)} % of the way`]
+        : [];
+    })(technique.steps[i + 1]),
   }));
 }
 
 export function formatReport(technique: ContentTechnique, reports: StepReport[]): string {
   const lines = [`${technique.slug} (${technique.name}), ${reports.length} steps`];
   for (const r of reports) {
-    const all = [...r.boneWarnings, ...r.mirrored, ...r.underMat, ...r.contacts];
+    const all = [
+      ...r.boneWarnings,
+      ...r.mirrored,
+      ...r.underMat,
+      ...r.contacts,
+      ...r.volume,
+      ...r.toNext,
+    ];
     lines.push(`step ${r.index}  ${r.title}${all.length === 0 ? '  OK' : ''}`);
     for (const w of r.boneWarnings) lines.push(`  bone length  ${w}`);
     for (const w of r.mirrored) lines.push(`  mirrored     ${w}`);
     for (const w of r.underMat) lines.push(`  mat          ${w}`);
     for (const w of r.contacts) lines.push(`  overlap?     ${w}`);
+    for (const w of r.volume) lines.push(`  sinks in     ${w}`);
+    for (const w of r.toNext) lines.push(`  to next      ${w}`);
   }
   return lines.join('\n');
 }
 
 export const countIssues = (reports: StepReport[]): number =>
   reports.reduce(
-    (n, r) => n + r.boneWarnings.length + r.mirrored.length + r.underMat.length + r.contacts.length,
+    (n, r) =>
+      n +
+      r.boneWarnings.length +
+      r.mirrored.length +
+      r.underMat.length +
+      r.contacts.length +
+      r.volume.length +
+      r.toNext.length,
     0,
   );

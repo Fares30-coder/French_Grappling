@@ -1,10 +1,5 @@
-import {
-  type CurrentPose,
-  FIGHTERS,
-  type FighterPoseV1_11,
-  type JointV1_11,
-  type Vec3,
-} from '@tatamap/shared';
+import type { CurrentPose } from './pose';
+import { FIGHTERS, type FighterPoseV1_11, type JointV1_11, type Vec3 } from './skeleton-v1-11';
 
 /** Ease in/out; `t` is clamped to [0, 1]. */
 export function smoothstep(t: number): number {

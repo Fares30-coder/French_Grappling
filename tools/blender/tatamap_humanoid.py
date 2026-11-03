@@ -638,7 +638,7 @@ def _smoothstep(t):
     return t * t * (3 - 2 * t)
 
 
-# Same as apps/web/src/features/viewer/interpolate.ts: the hip moves in a straight line, each
+# Same as packages/shared/src/pose/interpolate.ts: the hip moves in a straight line, each
 # bone turns along a great circle and changes length linearly, so limbs keep their length.
 BONE_CHAIN = [
     ('hip', 'neck'), ('neck', 'head'),

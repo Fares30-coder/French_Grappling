@@ -1,5 +1,3 @@
-import type { CurrentPose, Vec3 } from '@tatamap/shared';
-import { JOINTS_V1_11 } from '@tatamap/shared';
 import { describe, expect, it } from 'vitest';
 import {
   BONE_CHAIN_V1_11,
@@ -9,6 +7,8 @@ import {
   slerpUnit,
   smoothstep,
 } from './interpolate';
+import type { CurrentPose } from './pose';
+import { JOINTS_V1_11, type Vec3 } from './skeleton-v1-11';
 
 const makePose = (offset: number): CurrentPose => {
   const fighter = (base: number) =>

@@ -34,8 +34,16 @@ export function jointsBelowMat(
   return out;
 }
 
-/** Shortest distance between segments p1-q1 and p2-q2 (Ericson, Real-Time Collision Detection). */
-export function segmentDistance(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3): number {
+/**
+ * Closest points of segments p1-q1 and p2-q2 (Ericson, Real-Time Collision Detection): p at
+ * parameter s on the first, q at t on the second.
+ */
+export function closestPoints(
+  p1: Vec3,
+  q1: Vec3,
+  p2: Vec3,
+  q2: Vec3,
+): { s: number; t: number; p: Vec3; q: Vec3 } {
   const d1 = sub(q1, p1);
   const d2 = sub(q2, p2);
   const r = sub(p1, p2);
@@ -45,7 +53,7 @@ export function segmentDistance(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3): number 
   const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
   let s: number;
   let t: number;
-  if (a < 1e-9 && e < 1e-9) return length(r);
+  if (a < 1e-9 && e < 1e-9) return { s: 0, t: 0, p: p1, q: p2 };
   if (a < 1e-9) {
     s = 0;
     t = clamp01(f / e);
@@ -68,7 +76,13 @@ export function segmentDistance(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3): number 
       }
     }
   }
-  return length(sub(add(p1, scale(d1, s)), add(p2, scale(d2, t))));
+  return { s, t, p: add(p1, scale(d1, s)), q: add(p2, scale(d2, t)) };
+}
+
+/** Shortest distance between segments p1-q1 and p2-q2. */
+export function segmentDistance(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3): number {
+  const { p, q } = closestPoints(p1, q1, p2, q2);
+  return length(sub(p, q));
 }
 
 export type Contact = {

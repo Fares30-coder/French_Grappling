@@ -13,7 +13,7 @@ Le rendu actuel (sphères et cylindres) suffit pour valider le contenu, mais il 
 
 - Seuls 6 fichiers importent `three` ou `@react-three/*` : `apps/web/src/features/viewer/{FighterMesh,TechniqueScene,TechniqueViewer}.tsx`, `apps/web/src/features/admin/editor/{JointGizmo,CameraCapture}.tsx` et `apps/web/src/features/dev/PosePreviewPage.tsx`. `Tatami.tsx` n'utilise que du JSX R3F (sans import).
 - Les pages n'utilisent que `TechniqueViewer` (`features/techniques/TechniqueView.tsx`, `TechniqueEditorPage.tsx`, `PosePreviewPage.tsx`) et le type `ViewPreset` de `viewer/camera.ts`.
-- La logique d'animation est pure et testée en Node : `interpolate.ts`, `timeline.ts`, `camera.ts`, `reapply.ts`.
+- La logique d'animation est pure et testée en Node : `interpolate.ts` (dans `shared`), `timeline.ts`, `camera.ts`, `reapply.ts`.
 - `tools/pose-kit` n'importe pas `three` : `pose:render` pilote le vrai viewer via Playwright sur `/dev/pose-preview`.
 - Une poignée de couplage : `TechniqueSceneProps.onJointPointerDown` expose `ThreeEvent<PointerEvent>` (type R3F) aux pages, alors que l'éditeur n'utilise que `joint`.
 - Le contenu (15 techniques dans `content/techniques/`) est en `v1-11` ; `content:export` passe déjà par `poseSchema` + `upgradePose`, mais `content:import` valide avec `currentPoseSchema` (via `stepInputSchema`).
@@ -158,7 +158,7 @@ Ne pas attendre trop : la conversion est automatique, mais l'affinage manuel des
 
 **Réécrit** : `features/viewer/*.tsx` (scène, `FighterMesh`, tatami, caméras, contrôles), `rig.ts` si écrit avec les maths de three, les enfants 3D de l'éditeur (`JointGizmo`, `CameraCapture`), `PosePreviewPage`. Éventuellement l'asset si le moteur ne lit pas le glTF (tous les candidats sérieux le lisent).
 
-**Ne bouge pas** : format de pose et `shared`, API et base, `content/`, pages et éditeur hors 3D (ils ne voient que le contrat de F3), `interpolate.ts`, `timeline.ts`, `camera.ts`, `reapply.ts`, pose-kit (`pose:render` capture la page, quel que soit le moteur).
+**Ne bouge pas** : format de pose et `shared`, API et base, `content/`, pages et éditeur hors 3D (ils ne voient que le contrat de F3), `interpolate.ts` (dans `shared`), `timeline.ts`, `camera.ts`, `reapply.ts`, pose-kit (`pose:render` capture la page, quel que soit le moteur).
 
 **Justifié seulement si** un besoin précis est hors de portée de three/R3F après essai : par exemple rendu photoréaliste de tissu, ou une app native qui ne pourrait pas embarquer de WebView. Un « meilleur rendu » général ne le justifie pas : il vient du modèle, des matériaux et de l'éclairage, pas du moteur. Coût estimé : quelques jours, grâce aux frontières ci-dessus.
 
