@@ -46,7 +46,8 @@ to the bones, scaled by the part's radius, so a bent thigh or arm does not drag 
 Upper arms and thighs have a twist bone (the twist spreads along the limb instead of pinching
 the shoulder or the hip), a deltoid bone halfway between the clavicle and the upper arm rounds the
 shoulder over a raised arm, the skin keeps its volume at the joints (dual quaternions), and the
-derived rolls and facing turn at most 15 degrees per frame, so they never pop.
+derived rolls and facing turn at most 60 degrees per frame, so they never pop (slower, a limb
+moving at a normal speed lagged behind its pose).
 Each finger has three phalanx bones and the thumb three. A hand follows the pose's `hands`
 (`grip`: fist, `push`: flat, `free`: relaxed; set in the editor, ADR 0002 addendum). A hand left
 out is automatic: it closes when its point is within 3 cm of the opponent's body (or of the
@@ -57,6 +58,22 @@ step's shape, changing at most 0.12 per frame.
 build_humanoids()                    # hides the stick mannequins from renders
 bake_humanoids('content/techniques/<slug>.json')  # every frame, the site's timing
 ```
+
+## Site model
+
+The site's viewer shows the same mannequin (ADR 0004, addendum 2026-11-03):
+
+```sh
+blender -b --factory-startup -P tools/blender/export_site_model.py -- apps/web/public/models/fighter.v1.glb
+blender -b --factory-startup -P tools/blender/rig_fixture.py -- poses.json apps/web/src/features/viewer/rig.fixture.json
+```
+
+The first exports one white body (tinted by the viewer) at rest, with each bone's rest frame in
+the scene extras. Bump `MODEL_VERSION` and the file name when the model changes, so the PWA cache
+moves on. The second writes the reference bone frames `rig.test.ts` checks the site's port of
+`bone_frames` against (`apps/web/src/features/viewer/rig.ts`): rerun it after any change to the
+derived points, rolls or hands here, and port the change. `poses.json` must hold public poses only
+(the fixture is committed): the scissor sweep seed poses, `{"poses": [...]}`.
 
 ## Transitions check
 

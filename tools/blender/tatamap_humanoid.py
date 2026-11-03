@@ -12,7 +12,8 @@ derived per frame (ADR 0004's problem, solved here only for rendering):
 - up = hip -> neck; forward = the thighs' direction across the spine (knees are in front of the
   body in nearly every grappling pose); left = up x forward, as in `mirroredFighters`.
 - shoulders = neck +/- 17 cm sideways, 5 cm down; hip joints = hip +/- 9 cm, 5 cm down;
-  wrist 7 cm before the hand point; toes along the forward direction, across the shin.
+  wrist 7 cm before the hand point; toes the way the kneecap points (forward when the leg is
+  straight), across the shin.
 - limb twist: arms turn with the direction the elbow points to, legs with the knee's; the thumb
   is opposite the elbow point, the top of the foot faces the knee.
 Hands (palm, four fingers, thumb) and feet (heel, arch, five toes) are rigid, in a relaxed
@@ -39,7 +40,9 @@ def _v(p):
     return Vector(p)
 
 
-MAX_TURN_DEG = 15  # per frame (30 fps): a pop in the derived facing or roll becomes a quick turn
+# Per frame (30 fps): only a pop in the derived facing or a roll becomes a quick turn. Slower
+# (it was 15) and a limb moving at a normal speed lagged behind its pose, twisted, for many frames.
+MAX_TURN_DEG = 60
 
 
 def _turn_towards(a, b, max_deg):
@@ -80,8 +83,10 @@ def _bend_dir(root, mid, end, straight_dir, fade_cm=6):
 
 
 DELTOID_CM = 8
-UPPER_ARM_CM = (21, 36)  # shoulder -> elbow kept in this range (v1-11 measures from the neck)
-SHOULDER_SHIFT_CM = 7
+# Shoulder -> elbow kept in this range: v1-11 measures the arm from the neck (35 cm), so a raised
+# arm left 18-22 cm from the shoulder (21 was allowed) and the shoulder looked crushed.
+UPPER_ARM_CM = (27, 34)
+SHOULDER_SHIFT_CM = 10
 
 
 def _shoulder(nominal, elbow, fwd, up):
@@ -100,11 +105,19 @@ def _shoulder(nominal, elbow, fwd, up):
     return s + (elbow - s).normalized() * shift
 
 
-def _swing_ref(direction, up, fwd, left):
-    """Roll of a limb's top half that only swings from "pointing forward", with no twist
+# No-twist references, in the torso frame (left, up, forward): (limb direction, roll there).
+# Arms swing from hanging down, elbow behind: raising one forward or out to the side does not
+# twist it (from "pointing forward", an arm out to the side counted as a 90 degree twist and the
+# skin wrung the upper arm). Legs swing from pointing forward, the knee up (sitting).
+ARM_SWING_REST = ((0, -1, 0), (0, 0, 1))
+LEG_SWING_REST = ((0, 0, 1), (0, 1, 0))
+
+
+def _swing_ref(direction, up, fwd, left, rest):
+    """Roll of a limb's top half that only swings from its rest direction, with no twist
     against the torso: the twist (elbow or knee direction) is taken by the bottom half."""
     local = Vector((direction.dot(left), direction.dot(up), direction.dot(fwd))).normalized()
-    z = Vector((0, 0, 1)).rotation_difference(local) @ Vector((0, 1, 0))
+    z = Vector(rest[0]).rotation_difference(local) @ Vector(rest[1])
     return left * z.x + up * z.y + fwd * z.z
 
 
@@ -133,17 +146,22 @@ def derived_points(f, prev_forward=None):
         q['hipj' + s] = hip + left * (9 * sign) - up * 5
         q['knee' + s] = p['knee' + s]
         q['ankle' + s] = p['foot' + s]
+        # The foot points like the kneecap (the torso's forward when the leg is straight): taken
+        # from the torso, it spun round the shin whenever the derived facing turned.
+        knee = _bend_dir(q['hipj' + s], q['knee' + s], q['ankle' + s], fwd)
         shin = (p['foot' + s] - p['knee' + s]).normalized()
-        foot_dir = fwd - shin * fwd.dot(shin)
+        foot_dir = knee - shin * knee.dot(shin)
         foot_dir = foot_dir.normalized() if foot_dir.length > 1e-3 else fwd
         q['toe' + s] = p['foot' + s] + foot_dir * 15
         elbow = _bend_dir(q['shoulder' + s], q['elbow' + s], q['wrist' + s], -fwd)
         refs['elbow' + s] = elbow
         refs['thumb' + s] = -elbow
-        refs['knee' + s] = _bend_dir(q['hipj' + s], q['knee' + s], q['ankle' + s], fwd)
+        refs['knee' + s] = knee
         refs['foot_top' + s] = q['knee' + s] - q['ankle' + s]
-        refs['arm_swing' + s] = _swing_ref(q['elbow' + s] - q['shoulder' + s], up, fwd, left)
-        refs['leg_swing' + s] = _swing_ref(q['knee' + s] - q['hipj' + s], up, fwd, left)
+        refs['arm_swing' + s] = _swing_ref(q['elbow' + s] - q['shoulder' + s], up, fwd, left,
+                                            ARM_SWING_REST)
+        refs['leg_swing' + s] = _swing_ref(q['knee' + s] - q['hipj' + s], up, fwd, left,
+                                            LEG_SWING_REST)
     return q, refs
 
 
@@ -677,7 +695,9 @@ def _interpolate_fighter(a, b, t):
         else:
             u = _slerp_unit([x / la for x in da], [x / lb for x in db], t)
             off = [x * (la + (lb - la) * t) for x in u]
-        out[child] = [out[parent][i] + off[i] for i in range(3)]
+        joint = [out[parent][i] + off[i] for i in range(3)]
+        joint[1] = max(joint[1], min(a[child][1], b[child][1]))  # never through the mat
+        out[child] = joint
     return out
 
 

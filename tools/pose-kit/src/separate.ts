@@ -6,6 +6,7 @@ import {
   HEAD_RADIUS_CM,
   JOINTS_V1_11,
   type JointV1_11,
+  mirroredFighters,
   type Vec3,
 } from '@tatamap/shared';
 import { closestPoints, JOINT_RADIUS_CM } from './analyze';
@@ -50,7 +51,8 @@ export const MAX_MOVE_CM = 15;
  * slightly back towards the original poses. Pure; cameras and hands are kept.
  *
  * A limb that goes from one side of another to the other side between two steps cannot be fixed
- * by moving the steps: it needs a step in between, and stays reported.
+ * by moving the steps: it needs a step in between, and stays reported. A fighter that would end
+ * up a mirror image of itself (mirroredFighters) keeps its original pose in that step.
  */
 export function separateTechnique(
   poses: readonly CurrentPose[],
@@ -150,15 +152,25 @@ export function separateTechnique(
     }
   }
   const round = (p: Vec3): Vec3 => [r1(p[0]), r1(p[1]), r1(p[2])];
-  return joints.map((fighters, i) => ({
-    ...(poses[i] as CurrentPose),
-    fighters: Object.fromEntries(
-      FIGHTERS.map((f) => [
-        f,
-        Object.fromEntries(JOINTS_V1_11.map((j) => [j, round(fighters[f][j])])),
-      ]),
-    ) as CurrentPose['fighters'],
-  }));
+  return joints.map((fighters, i) => {
+    const before = poses[i] as CurrentPose;
+    const after: CurrentPose = {
+      ...before,
+      fighters: Object.fromEntries(
+        FIGHTERS.map((f) => [
+          f,
+          Object.fromEntries(JOINTS_V1_11.map((j) => [j, round(fighters[f][j])])),
+        ]),
+      ) as CurrentPose['fighters'],
+    };
+    // Pushed far enough, a body can turn into its own mirror image (L joints on its right):
+    // that fighter keeps its original pose.
+    const wasMirrored = new Set(mirroredFighters(before));
+    for (const f of mirroredFighters(after)) {
+      if (!wasMirrored.has(f)) after.fighters[f] = clone(before.fighters[f]);
+    }
+    return after;
+  });
 }
 
 /** One pose on its own: see separateTechnique. */

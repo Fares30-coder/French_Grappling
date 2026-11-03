@@ -1,5 +1,6 @@
-import { boneLengths, type FighterPoseV1_11, handednessScore } from '@tatamap/shared';
+import { boneLengths, type FighterPoseV1_11, handednessScore, type Vec3 } from '@tatamap/shared';
 import { describe, expect, it } from 'vitest';
+import { bentNecks } from './analyze';
 import {
   buildFighter,
   type FighterSpec,
@@ -86,7 +87,6 @@ describe('separateBodies', () => {
   });
 
   it('also separates inside a transition', () => {
-    // Clean at both steps, through my head in between.
     // He passes over me from back to front: clear at both steps, his feet through my head
     // halfway.
     // Shifted by hand: translateFighter clamps into the schema bounds.
@@ -97,7 +97,26 @@ describe('separateBodies', () => {
     const [a, b] = [makePose(me, over(-60)), makePose(me, over(60))];
     expect(maxPenetration(a) + maxPenetration(b)).toBe(0);
     expect(transitionPenetration(a, b)?.between).toMatch(/me head x opponent (foot|shin)/);
-    const [outA, outB] = separateTechnique([a, b]);
+    const [outA, outB] = separateTechnique([a, b], { iterations: 120 });
     expect(outA && outB && transitionPenetration(outA, outB)).toBeNull();
+  }, 30_000); // the relaxation is slow on CI runners
+});
+
+describe('separateTechnique guard', () => {
+  it('never leaves a fighter a mirror image of itself', () => {
+    // Bodies deep in each other: whatever the push, no fighter may come out mirrored.
+    const out = separateBodies(makePose(me, facing(5)), { maxMoveCm: 60 });
+    expect(handednessScore(out.fighters.me)).toBeGreaterThan(-15);
+    expect(handednessScore(out.fighters.opponent)).toBeGreaterThan(-15);
+  });
+});
+
+describe('bentNecks', () => {
+  it('flags a head bent past 60 degrees from the spine, not an upright one', () => {
+    expect(bentNecks(makePose(me, translateFighter(me, [0, 0, 300])))).toEqual([]);
+    const tucked = { ...me, head: [me.neck[0] + 20, me.neck[1] - 8, me.neck[2]] as Vec3 };
+    expect(
+      bentNecks(makePose(tucked, translateFighter(me, [0, 0, 300]))).map((n) => n.fighter),
+    ).toEqual(['me']);
   });
 });

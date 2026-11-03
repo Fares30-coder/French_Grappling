@@ -46,8 +46,8 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // The whole app is precached: code (3D chunk included), styles, fonts, icons.
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // The whole app is precached: code (3D chunk included), styles, fonts, icons, the 3D model.
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2,glb}'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],

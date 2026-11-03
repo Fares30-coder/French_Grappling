@@ -121,3 +121,17 @@ describe('interpolateFighter', () => {
     expect(children).toEqual(JOINTS_V1_11.filter((j) => j !== 'hip').sort());
   });
 });
+
+describe('interpolateFighter on the mat', () => {
+  it('never takes a joint lower than at both steps', () => {
+    // Shin on the mat behind the knee, then in front of it: the shorter arc between the two
+    // goes under the knee, 30 cm into the mat.
+    const a = makePose(0).fighters.me;
+    const knee: Vec3 = [a.hip[0], 12, a.hip[2]];
+    const before = { ...a, kneeL: knee, footL: [knee[0] - 40, 6, knee[2]] as Vec3 };
+    const after = { ...a, kneeL: knee, footL: [knee[0] + 40, 6, knee[2]] as Vec3 };
+    for (const s of [0.25, 0.5, 0.75]) {
+      expect(interpolateFighter(before, after, s).footL[1]).toBeGreaterThanOrEqual(6);
+    }
+  });
+});

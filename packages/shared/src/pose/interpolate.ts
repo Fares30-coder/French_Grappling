@@ -65,7 +65,8 @@ export const BONE_CHAIN_V1_11 = [
 /**
  * Interpolates the hip linearly, then each bone's direction along a great circle and its length
  * linearly. Moving joints in straight lines instead shortens a limb mid-transition (the hand cuts
- * the corner when the arm swings); this way a limb keeps its length and swings.
+ * the corner when the arm swings); this way a limb keeps its length and swings. No joint goes
+ * lower than at both steps (the arc would go through the mat): there, its bone stretches a little.
  */
 export function interpolateFighter(
   a: FighterPoseV1_11,
@@ -87,7 +88,11 @@ export function interpolateFighter(
             slerpUnit(scale(boneA, 1 / lengthA), scale(boneB, 1 / lengthB), s),
             lengthA + (lengthB - lengthA) * s,
           );
-    out[child] = add(out[parent], offset);
+    const joint = add(out[parent], offset);
+    // A turning bone sweeps an arc that can dip into the mat (a shin swinging under the knee):
+    // a joint never goes lower than the lower of its two steps; what hangs off it follows.
+    joint[1] = Math.max(joint[1], Math.min(a[child][1], b[child][1]));
+    out[child] = joint;
   }
   return out;
 }

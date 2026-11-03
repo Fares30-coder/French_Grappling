@@ -116,10 +116,12 @@ export function TechniqueScene({
   const prevStepIndexRef = useRef<number | null>(null);
   const prevStepsRef = useRef<ReadonlyArray<ViewerStep> | null>(null);
 
+  /** `hands`: the shown step's (a transition takes the next step's, like the videos). */
   const applyPose = useCallback(
-    (pose: CurrentPose) => {
-      meRef.current?.setPose(pose.fighters.me);
-      opponentRef.current?.setPose(pose.fighters.opponent);
+    (pose: CurrentPose, hands: CurrentPose['hands'] = pose.hands) => {
+      const { me, opponent } = pose.fighters;
+      meRef.current?.setPose(me, { other: opponent, hands: hands?.me });
+      opponentRef.current?.setPose(opponent, { other: me, hands: hands?.opponent });
       invalidate(); // the canvas only renders on demand when stopped
     },
     [invalidate],
@@ -175,7 +177,7 @@ export function TechniqueScene({
     const a = steps[from]?.pose;
     const b = steps[to]?.pose;
     if (!a || !b) return;
-    applyPose(t === 0 ? a : interpolatePose(a, b, t));
+    applyPose(t === 0 ? a : interpolatePose(a, b, t), (t === 0 ? a : b).hands);
 
     // Entering a transition means entering the next step.
     const entered = t > 0 ? to : from;
