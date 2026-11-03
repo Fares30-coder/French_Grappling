@@ -25,6 +25,21 @@ setup_vertical_video('content/techniques/<slug>.json', '/path/out.mp4')
 
 Render the video without blocking the UI: `blender -b file.blend -S video -a`.
 
+Before rendering, make the camera follow the fighters (after `bake_humanoids` on the same
+technique):
+
+```sh
+blender -b content/blender/tatamap.blend -P tools/blender/frame_video.py -- content/techniques/<slug>.json
+```
+
+`setup_vertical_video` alone orbits a fixed point at a fixed distance, so fighters who move leave
+the frame and two bodies lying side by side are tiny or cut in the narrow vertical frame.
+`video_camera.py` (pure Python, `python3 -m unittest tools/blender/test_video_camera.py`) frames
+every frame: it turns three quarters of the way towards the fighters' long axis on the mat (from
+the side of the step's camera hint), stays 32 degrees above them and sways slowly, and backs off
+just enough for every joint to fit between the title and the step caption. Positions and
+distance are smoothed over time; the distance is widened before smoothing, so nobody is cut.
+
 After an export: `pnpm content:import`, `pnpm pose:check <slug>`, review in the editor. The first
 and last steps of a technique must still equal the reference poses: re-export the references too,
 or leave those steps untouched.
