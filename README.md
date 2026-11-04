@@ -65,6 +65,7 @@ unset ADMIN_PASSWORD
 
 1. `pnpm admin:create <email>` (une fois), puis `pnpm dev`.
 2. Ouvre `http://localhost:5173/admin` : connexion, liste des techniques, « Nouvelle technique », éditeur de poses (vues 3D / Face / Profil / Dessus, aperçu, publication). Cmd/Ctrl+S enregistre, Cmd/Ctrl+Z annule.
+   Sous la vue 3D, « Vidéo de référence » ouvre une vidéo de démonstration locale (elle reste dans le navigateur, rien n'est envoyé) : à côté de la vue ou superposée et transparente, image par image. « Lier ce moment à l'étape » retient le moment de chaque étape (dans le navigateur, par numéro d'étape). Range les vidéos dans `content/references/` (repo privé), jamais dans ce repo : `.gitignore` refuse les vidéos.
 3. Une technique publiée est visible sur `/techniques/<slug>`.
 
 La méthode de saisie recommandée (dupliquer la technique la plus proche, soigner l'étape 1, etc.) est dans `docs/plan-phase-2.md`, section « Ce dont Fares a besoin pour saisir ses 15 techniques ».
