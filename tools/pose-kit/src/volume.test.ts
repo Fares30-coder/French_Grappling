@@ -120,3 +120,12 @@ describe('bentNecks', () => {
     ).toEqual(['me']);
   });
 });
+
+describe('separateTechnique and necks', () => {
+  it('never leaves a head bent past what a neck does', () => {
+    // A head pushed by the other body: whatever the push, it comes out within the limit.
+    const tucked = { ...me, head: [me.neck[0] + 20, me.neck[1] - 8, me.neck[2]] as Vec3 };
+    const out = separateBodies(makePose(tucked, facing(30)));
+    expect(bentNecks(out)).toEqual([]);
+  });
+});
