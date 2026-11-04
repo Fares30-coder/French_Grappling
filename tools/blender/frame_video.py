@@ -7,16 +7,15 @@ camera no longer orbits a fixed centre; each frame it frames both fighters betwe
 Saves the .blend.
 """
 
-import json
 import os
 import sys
 
 import bpy
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
 exec(open(os.path.join(HERE, 'tatamap_rig.py')).read())
 exec(open(os.path.join(HERE, 'tatamap_humanoid.py')).read())
-sys.path.insert(0, HERE)
 import video_camera  # noqa: E402
 
 
@@ -35,8 +34,7 @@ def step_hints(technique):
 
 
 def frame_video(technique_path, start_frame=1):
-    with open(technique_path, encoding='utf-8') as fh:
-        technique = json.load(fh)
+    technique = load_technique(technique_path)  # poses upgraded to v2-21, as bake_humanoids does
     frames = site_timeline(technique)
     track = video_camera.camera_track(frames, step_hints(technique), FPS)
     scene = bpy.data.scenes['Scene']

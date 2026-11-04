@@ -5,7 +5,6 @@ import {
   type CurrentPose,
   FIGHTERS,
   type FighterId,
-  type FighterPoseV1_11,
   HEAD_RADIUS_CM,
   mirroredFighters,
   type Vec3,
@@ -182,14 +181,20 @@ export function separateTechnique(
     }
     // Pushes on the head can fold it on the neck (and an original pose may already be): bring it
     // back within what a neck does.
-    for (const f of FIGHTERS) after.fighters[f].head = unbendHead(after.fighters[f]);
+    for (const f of FIGHTERS) {
+      const fighter = after.fighters[f];
+      const head = unbendHead(fighter);
+      // The nose turns with the head (same offset from the head centre).
+      fighter.nose = round(add(head, sub(fighter.nose, fighter.head)));
+      fighter.head = head;
+    }
     return after;
   });
 }
 
 /** The head turned towards the spine line, in their plane, to at most MAX_HEAD_BEND_DEG - 2. */
-function unbendHead(f: FighterPoseV1_11): Vec3 {
-  const spine = unit(sub(f.neck, f.hip));
+function unbendHead(f: CurrentPose['fighters']['me']): Vec3 {
+  const spine = unit(sub(f.neck, f.pelvis));
   const head = sub(f.head, f.neck);
   const length = distance(f.head, f.neck);
   const along = unit(head);
