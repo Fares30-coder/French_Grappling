@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs';
-import { FIGHTERS, JOINTS_V1_11 } from '@tatamap/shared';
+import { CURRENT_JOINTS, FIGHTERS } from '@tatamap/shared';
 import { loadTechnique, resolveTechniqueFile } from '../load';
 import { MAX_MOVE_CM, separateTechnique } from '../separate';
 import { distance } from '../vec';
@@ -47,21 +47,23 @@ const depth = (poses: typeof before, i: number) => {
   return `${maxPenetration(pose).toFixed(1)} cm${inside === null ? '' : ` (to next ${inside.toFixed(1)})`}`;
 };
 
-// The raw JSON is edited in place (only joint coordinates), so key order and other fields stay.
+// The raw JSON is edited in place (only the poses' skeleton and joints), so key order and the
+// other fields stay. A pose of an older skeleton is written back upgraded.
 const raw = JSON.parse(readFileSync(file, 'utf8')) as {
-  steps: Array<{ pose: { fighters: Record<string, Record<string, unknown>> } }>;
+  steps: Array<{ pose: { skeleton: string; fighters: Record<string, Record<string, unknown>> } }>;
 };
 let changed = 0;
 for (const [i, step] of loaded.technique.steps.entries()) {
   const pose = after[i];
   if (!pose) continue;
   let moved = 0;
+  const out = raw.steps[i]?.pose;
+  if (out) out.skeleton = pose.skeleton;
   for (const f of FIGHTERS) {
-    for (const j of JOINTS_V1_11) {
+    for (const j of CURRENT_JOINTS) {
       moved = Math.max(moved, distance(pose.fighters[f][j], step.pose.fighters[f][j]));
-      const out = raw.steps[i]?.pose.fighters[f];
-      if (out) out[j] = pose.fighters[f][j];
     }
+    if (out) out.fighters[f] = { ...pose.fighters[f] };
   }
   if (moved > 0) changed++;
   console.log(

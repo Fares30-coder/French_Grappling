@@ -1,22 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { mirrorPose } from './edit';
-import { deepClone, validPose } from './fixtures';
+import { deepClone, validCurrentPose as validPose } from './fixtures';
 import { handednessScore, mirroredFighters } from './handedness';
-import type { FighterPoseV1_11 } from './skeleton-v1-11';
+import { CURRENT_JOINTS, CURRENT_MIRRORED_JOINT, type CurrentFighterPose } from './pose';
 import { STARTER_POSE } from './starter-pose';
 
 /** Same points, L/R names swapped: the mirror image of the body. */
-const swapSides = (f: FighterPoseV1_11): FighterPoseV1_11 => ({
-  ...f,
-  elbowL: f.elbowR,
-  handL: f.handR,
-  kneeL: f.kneeR,
-  footL: f.footR,
-  elbowR: f.elbowL,
-  handR: f.handL,
-  kneeR: f.kneeL,
-  footR: f.footL,
-});
+const swapSides = (f: CurrentFighterPose): CurrentFighterPose =>
+  Object.fromEntries(
+    CURRENT_JOINTS.map((j) => [j, f[CURRENT_MIRRORED_JOINT[j]]]),
+  ) as CurrentFighterPose;
 
 describe('handednessScore', () => {
   it('is positive for the starter pose (left side towards -z when facing +x)', () => {

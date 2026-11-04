@@ -1,15 +1,15 @@
 import {
   type AdminTechnique,
   type CameraHint,
+  type CurrentJoint,
   type CurrentPose,
-  clampVec3,
   DEFAULT_TRANSITION_MS,
   type FighterId,
   type HandSide,
   type HandState,
-  type JointV1_11,
   mirroredFighters,
   mirrorPose,
+  moveJoint,
   publishIssues,
   type StandardBodyWarning,
   type StepInput,
@@ -22,7 +22,7 @@ import {
 /** The editable content of a technique (no id, status, dates, nor version: see EditorState). */
 export type EditorTechnique = Omit<TechniqueUpdateInput, 'version'>;
 export type EditorStep = StepInput;
-export type JointRef = { fighter: FighterId; joint: JointV1_11 };
+export type JointRef = { fighter: FighterId; joint: CurrentJoint };
 
 /** Same limits as techniqueUpdateInputSchema. */
 export const MAX_STEPS = 40;
@@ -175,7 +175,7 @@ function setJointInPose(pose: CurrentPose, ref: JointRef, position: Vec3): Curre
     ...pose,
     fighters: {
       ...pose.fighters,
-      [ref.fighter]: { ...pose.fighters[ref.fighter], [ref.joint]: clampVec3(position) },
+      [ref.fighter]: moveJoint(pose.fighters[ref.fighter], ref.joint, position),
     },
   };
 }

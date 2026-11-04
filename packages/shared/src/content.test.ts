@@ -4,7 +4,7 @@ import {
   contentTagsFileSchema,
   contentTechniqueSchema,
 } from './content';
-import { deepClone, validPose } from './pose/fixtures';
+import { deepClone, validCurrentPose, validPose } from './pose/fixtures';
 
 const step = (title: string) => ({
   title,
@@ -33,6 +33,15 @@ const ok = (input: unknown) => contentTechniqueSchema.safeParse(input).success;
 describe('contentTechniqueSchema', () => {
   it('accepts a valid technique', () => {
     expect(ok(valid())).toBe(true);
+  });
+
+  it('upgrades poses of an older skeleton and keeps current ones', () => {
+    const parsed = contentTechniqueSchema.parse(valid());
+    expect(parsed.steps[0]?.pose.skeleton).toBe('v2-21');
+    expect(parsed.steps[0]?.pose).toEqual(validCurrentPose);
+    const currentStep = { ...step('a'), pose: deepClone(validCurrentPose) };
+    const current = { ...valid(), steps: [currentStep, currentStep] };
+    expect(contentTechniqueSchema.parse(current).steps[0]?.pose).toEqual(validCurrentPose);
   });
 
   it('refuses ids, versions and unknown fields', () => {

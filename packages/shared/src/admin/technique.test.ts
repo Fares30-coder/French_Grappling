@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deepClone, validPose } from '../pose/fixtures';
+import { deepClone, validCurrentPose as validPose } from '../pose/fixtures';
 import { publishIssues } from './publish';
 import { type AdminTechnique, adminTechniqueSchema, techniqueUpdateInputSchema } from './technique';
 

@@ -1,35 +1,40 @@
-"""Humanoid mannequins for Tatamap videos, driven by the 11 v1-11 joints.
+"""Humanoid mannequins for Tatamap videos, driven by the 21 v2-21 points.
 
-Run inside Blender after tatamap_rig.py (it reuses its helpers):
+Run inside Blender after tatamap_rig.py (it reuses its helpers), with tools/blender on sys.path
+(for tatamap_pose, the pose format shared with the site):
 
+    import sys; sys.path.insert(0, '/path/to/tools/blender')
     exec(open('/path/to/tools/blender/tatamap_rig.py').read())
     exec(open('/path/to/tools/blender/tatamap_humanoid.py').read())
     build_humanoids()                         # one organic body per fighter
     bake_humanoids('content/techniques/<slug>.json')  # keys every frame, site timing
 
-v1-11 has no shoulders, no hip joints, no hands or feet, and no torso orientation. They are
-derived per frame (ADR 0004's problem, solved here only for rendering):
-- up = hip -> neck; forward = the thighs' direction across the spine (knees are in front of the
-  body in nearly every grappling pose); left = up x forward, as in `mirroredFighters`.
-- shoulders = neck +/- 17 cm sideways, 5 cm down; hip joints = hip +/- 9 cm, 5 cm down;
-  wrist 7 cm before the hand point; toes the way the kneecap points (forward when the leg is
-  straight), across the shin.
+Shoulders, hip joints, chest, fingertips, toes and nose are points of the pose (a v1-11 file is
+upgraded on load, tatamap_pose.upgrade_pose, which puts them where this script used to derive
+them). Still derived per frame, as on the site (apps/web/src/features/viewer/rig.ts):
+- up = pelvis -> neck; left = across the hip joints; forward = left x up.
+- the waist, the collarbone, the wrist 7 cm before the hand point.
 - limb twist: arms turn with the direction the elbow points to, legs with the knee's; the thumb
   is opposite the elbow point, the top of the foot faces the knee.
 Hands (palm, four fingers, thumb) and feet (heel, arch, five toes) are rigid, in a relaxed
 shape. Body weights are computed here, not by Blender's automatic weights: each vertex follows
 the bones whose surface it is on, so a bent thigh or arm no longer drags the pelvis or the back.
 The animation follows the site: each step held DEFAULT_HOLD_MS, then a smoothstep transition
-of the next step's transitionMs, bones turned as on the site (_interpolate_fighter).
+of the next step's transitionMs, bones turned as on the site (tatamap_pose.interpolate_fighter).
 """
 
-import json
 import math
 
 import bmesh
 import bpy
 from mathutils import Matrix, Vector
 from mathutils.geometry import intersect_point_line
+
+try:
+    from tatamap_pose import interpolate_fighter, load_technique, upgrade_fighter
+except ImportError as error:  # exec'd without tools/blender on sys.path
+    raise ImportError("put tools/blender on sys.path first: "
+                      "import sys; sys.path.insert(0, '/path/to/tools/blender')") from error
 
 HUMANOID_SUFFIX = '_humanoid'
 
@@ -56,14 +61,20 @@ def _turn_towards(a, b, max_deg):
 
 
 def _frame(f, prev_forward=None):
-    """Orthonormal body frame (up, forward, left) of a v1-11 fighter."""
-    hip, neck = _v(f['hip']), _v(f['neck'])
+    """Orthonormal body frame (up, forward, left) of a v2-21 fighter: forward is square to the
+    line across the hip joints (the thighs give it if they sit on the spine)."""
+    hip, neck = _v(f['pelvis']), _v(f['neck'])
     up = (neck - hip).normalized()
-    thighs = _v(f['kneeL']) + _v(f['kneeR']) - 2 * hip
-    fwd = thighs - up * thighs.dot(up)
-    if fwd.length < 3:
-        fwd = prev_forward.copy() if prev_forward is not None else Vector((1, 0, 0))
-        fwd -= up * fwd.dot(up)
+    across = _v(f['hipL']) - _v(f['hipR'])
+    across -= up * across.dot(up)
+    if across.length > 3:
+        fwd = across.cross(up)
+    else:
+        thighs = _v(f['kneeL']) + _v(f['kneeR']) - 2 * hip
+        fwd = thighs - up * thighs.dot(up)
+        if fwd.length < 3:
+            fwd = prev_forward.copy() if prev_forward is not None else Vector((1, 0, 0))
+            fwd -= up * fwd.dot(up)
     fwd.normalize()
     if prev_forward is not None:  # the torso turns at most MAX_TURN_DEG per frame
         before = prev_forward - up * prev_forward.dot(up)
@@ -83,26 +94,6 @@ def _bend_dir(root, mid, end, straight_dir, fade_cm=6):
 
 
 DELTOID_CM = 8
-# Shoulder -> elbow kept in this range: v1-11 measures the arm from the neck (35 cm), so a raised
-# arm left 18-22 cm from the shoulder (21 was allowed) and the shoulder looked crushed.
-UPPER_ARM_CM = (27, 34)
-SHOULDER_SHIFT_CM = 10
-
-
-def _shoulder(nominal, elbow, fwd, up):
-    """Shoulder point, moved like a shoulder blade so the upper arm is never crushed or overlong:
-    away from an elbow that comes too close (depression), towards one that is far (protraction),
-    and a little forward / up with the arm."""
-    # Mid-transition the elbow can still pass close to the shoulder (bones turn around the neck):
-    # every shift fades out as it gets close, so the shoulder never jumps.
-    near = min(1.0, (elbow - nominal).length / 8)
-    reach = (elbow - nominal).normalized() * near
-    s = nominal + (fwd * max(0.0, reach.dot(fwd)) + up * max(0.0, reach.dot(up))) * 3
-    d = (elbow - s).length
-    lo, hi = UPPER_ARM_CM
-    shift = min(d - lo, 0.0) + max(d - hi, 0.0)  # < 0: move away from the elbow
-    shift = max(-SHOULDER_SHIFT_CM, min(SHOULDER_SHIFT_CM, shift)) * min(1.0, d / 8)
-    return s + (elbow - s).normalized() * shift
 
 
 # No-twist references, in the torso frame (left, up, forward): (limb direction, roll there).
@@ -122,37 +113,37 @@ def _swing_ref(direction, up, fwd, left, rest):
 
 
 def derived_points(f, prev_forward=None):
-    """Humanoid points (cm) and bone roll references for a v1-11 fighter."""
+    """Humanoid points (cm) and bone roll references for a v2-21 fighter."""
     up, fwd, left = _frame(f, prev_forward)
     p = {k: _v(val) for k, val in f.items()}
-    hip, neck, head = p['hip'], p['neck'], p['head']
+    hip, neck, head = p['pelvis'], p['neck'], p['head']
     q = {
         'hip': hip,
         'waist': hip + up * 16,
-        'chest': hip + up * 34,
+        'chest': p['chest'],
         'neck': neck,
         'neck_top': neck + (head - neck) * 0.4,  # stays inside the head sphere
         'head': head,
         'head_top': head + (head - neck).normalized() * 11,
         'clav': neck - up * 3,
     }
-    refs = {'up': up, 'fwd': fwd, 'left': left}
-    for s, sign in (('L', 1), ('R', -1)):
-        q['shoulder' + s] = _shoulder(neck + left * (17 * sign) - up * 5, p['elbow' + s], fwd, up)
+    # The head faces its nose (square to the head's axis).
+    head_axis = (head - neck).normalized()
+    face = p['nose'] - head
+    face -= head_axis * face.dot(head_axis)
+    refs = {'up': up, 'fwd': fwd, 'left': left,
+            'face': face.normalized() if face.length > 1e-3 else fwd.copy()}
+    for s in 'LR':
+        q['shoulder' + s] = p['shoulder' + s]
         q['elbow' + s] = p['elbow' + s]
         fore = (p['hand' + s] - p['elbow' + s]).normalized()
         q['wrist' + s] = p['hand' + s] - fore * 7
-        q['finger' + s] = p['hand' + s] + fore * 8
-        q['hipj' + s] = hip + left * (9 * sign) - up * 5
+        q['finger' + s] = p['handTip' + s]
+        q['hipj' + s] = p['hip' + s]
         q['knee' + s] = p['knee' + s]
         q['ankle' + s] = p['foot' + s]
-        # The foot points like the kneecap (the torso's forward when the leg is straight): taken
-        # from the torso, it spun round the shin whenever the derived facing turned.
+        q['toe' + s] = p['toe' + s]
         knee = _bend_dir(q['hipj' + s], q['knee' + s], q['ankle' + s], fwd)
-        shin = (p['foot' + s] - p['knee' + s]).normalized()
-        foot_dir = knee - shin * knee.dot(shin)
-        foot_dir = foot_dir.normalized() if foot_dir.length > 1e-3 else fwd
-        q['toe' + s] = p['foot' + s] + foot_dir * 15
         elbow = _bend_dir(q['shoulder' + s], q['elbow' + s], q['wrist' + s], -fwd)
         refs['elbow' + s] = elbow
         refs['thumb' + s] = -elbow
@@ -171,7 +162,7 @@ HBONES = {
     'abdomen': ('waist', 'chest', 'fwd'),
     'chest': ('chest', 'neck', 'fwd'),
     'neck': ('neck', 'neck_top', 'fwd'),
-    'head': ('neck_top', 'head_top', 'fwd'),
+    'head': ('neck_top', 'head_top', 'face'),
 }
 for _s in 'LR':
     HBONES.update({
@@ -218,6 +209,7 @@ def _bone_matrix(head, tail, ref, rest_length):
 # --- Rest pose: standing, arms in an A, so limbs are far from each other when weighting -------
 
 def _humanoid_rest():
+    """The rest pose's 11 base joints (v1-11, standard lengths); upgraded where it is used."""
     j = {'hip': (0, 93, 0), 'neck': (0, 143, 0), 'head': (0, 165, 0)}
     for s, sx in (('L', 1), ('R', -1)):
         j['elbow' + s] = (sx * 30, 119, -6)
@@ -472,7 +464,7 @@ def _set_group(obj, bone):
 
 
 def _build_humanoid(fid, rgb):
-    q, refs = derived_points(_humanoid_rest())
+    q, refs = derived_points(upgrade_fighter(_humanoid_rest()))
     col = bpy.data.collections[COLLECTION]
 
     # Armature: independent bones (no hierarchy), each posed directly from the joints.
@@ -586,9 +578,9 @@ def build_humanoids():
 GRIP_CM = (3, 10)  # hand point to the opponent's surface: closed below, relaxed above
 GRIP_SPEED = 0.12  # most the hand shape changes per frame (about a quarter of a second to close)
 # The opponent's volume, as capsules: (joint, joint, radius cm).
-BODY_CAPSULES = [('hip', 'neck', 14), ('neck', 'head', 6), ('head', 'head', 12)] + [
+BODY_CAPSULES = [('pelvis', 'neck', 14), ('neck', 'head', 6), ('head', 'head', 12)] + [
     c for s in 'LR' for c in (('neck', 'elbow' + s, 5), ('elbow' + s, 'hand' + s, 4),
-                              ('hip', 'knee' + s, 8), ('knee' + s, 'foot' + s, 5.5))]
+                              ('pelvis', 'knee' + s, 8), ('knee' + s, 'foot' + s, 5.5))]
 
 
 def _segment_distance(p, a, b):
@@ -609,7 +601,7 @@ def grip_amount(f, s, other=None):
 
 
 def bone_frames(f, prev=None, other=None, hands=None):
-    """Each bone's (head, tail, z axis) in Tatamap cm for a v1-11 fighter, and the state to
+    """Each bone's (head, tail, z axis) in Tatamap cm for a v2-21 fighter, and the state to
     pass as `prev` for the next frame: rolls then turn at most MAX_TURN_DEG per frame, and
     hand shapes change at most GRIP_SPEED per frame. `hands`: the fighter's entry of the pose's
     `hands` ({'L': 'grip' | 'push' | 'free'}); a hand left out closes on `other` (auto)."""
@@ -640,7 +632,7 @@ def bone_frames(f, prev=None, other=None, hands=None):
 
 
 def pose_humanoid(rig, f, prev=None, other=None, hands=None):
-    """Poses a humanoid rig on a v1-11 fighter (`other`: the opponent's joints, for automatic
+    """Poses a humanoid rig on a v2-21 fighter (`other`: the opponent's joints, for automatic
     grips; `hands`: its hand states); returns the state for the next frame."""
     bones, state = bone_frames(f, prev, other, hands)
     inv = rig.matrix_world.inverted()
@@ -656,51 +648,6 @@ def _smoothstep(t):
     return t * t * (3 - 2 * t)
 
 
-# Same as packages/shared/src/pose/interpolate.ts: the hip moves in a straight line, each
-# bone turns along a great circle and changes length linearly, so limbs keep their length.
-BONE_CHAIN = [
-    ('hip', 'neck'), ('neck', 'head'),
-    ('neck', 'elbowL'), ('elbowL', 'handL'), ('neck', 'elbowR'), ('elbowR', 'handR'),
-    ('hip', 'kneeL'), ('kneeL', 'footL'), ('hip', 'kneeR'), ('kneeR', 'footR'),
-]
-
-
-def _slerp_unit(a, b, t, eps=1e-6):
-    angle = math.acos(max(-1.0, min(1.0, sum(x * y for x, y in zip(a, b)))))
-    if angle < eps:
-        return a
-    if angle > math.pi - eps:
-        # Opposite directions: turn through a fixed perpendicular (as the viewer does).
-        helper = (0, 1, 0) if abs(a[1]) < 0.9 else (1, 0, 0)
-        axis = (a[1] * helper[2] - a[2] * helper[1], a[2] * helper[0] - a[0] * helper[2],
-                a[0] * helper[1] - a[1] * helper[0])
-        n = math.hypot(*axis)
-        perp = [(axis[1] * a[2] - axis[2] * a[1]) / n, (axis[2] * a[0] - axis[0] * a[2]) / n,
-                (axis[0] * a[1] - axis[1] * a[0]) / n]
-        c, s = math.cos(math.pi * t), math.sin(math.pi * t)
-        return [a[i] * c + perp[i] * s for i in range(3)]
-    s = math.sin(angle)
-    ka, kb = math.sin((1 - t) * angle) / s, math.sin(t * angle) / s
-    return [a[i] * ka + b[i] * kb for i in range(3)]
-
-
-def _interpolate_fighter(a, b, t):
-    out = {'hip': [a['hip'][i] + (b['hip'][i] - a['hip'][i]) * t for i in range(3)]}
-    for parent, child in BONE_CHAIN:
-        da = [a[child][i] - a[parent][i] for i in range(3)]
-        db = [b[child][i] - b[parent][i] for i in range(3)]
-        la, lb = math.hypot(*da), math.hypot(*db)
-        if la == 0 or lb == 0:
-            off = [da[i] + (db[i] - da[i]) * t for i in range(3)]
-        else:
-            u = _slerp_unit([x / la for x in da], [x / lb for x in db], t)
-            off = [x * (la + (lb - la) * t) for x in u]
-        joint = [out[parent][i] + off[i] for i in range(3)]
-        joint[1] = max(joint[1], min(a[child][1], b[child][1]))  # never through the mat
-        out[child] = joint
-    return out
-
-
 def site_timeline(technique):
     """[(frame, poses)] for every frame, with the site's hold and smoothstep transitions."""
     steps = technique['steps']
@@ -714,7 +661,7 @@ def site_timeline(technique):
             n = max(1, round(steps[i + 1]['transitionMs'] / 1000 * FPS))
             for k in range(1, n + 1):
                 t = _smoothstep(k / n)
-                frames.append({fid: _interpolate_fighter(here[fid], nxt[fid], t) for fid in here})
+                frames.append({fid: interpolate_fighter(here[fid], nxt[fid], t) for fid in here})
     return frames
 
 
@@ -734,8 +681,7 @@ def site_hands(technique):
 
 def bake_humanoids(technique_path, start_frame=1):
     """Keys the humanoids on every frame of the technique, with the site's timing."""
-    with open(technique_path, encoding='utf-8') as fh:
-        technique = json.load(fh)
+    technique = load_technique(technique_path)  # poses upgraded to v2-21
     frames = site_timeline(technique)
     hands = site_hands(technique)
     rigs = {fid: bpy.data.objects[fid + HUMANOID_SUFFIX] for fid in FIGHTERS}

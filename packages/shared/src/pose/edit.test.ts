@@ -4,11 +4,13 @@ import {
   boneLengths,
   clampVec3,
   handState,
+  JOINT_FOLLOWERS,
   mirrorPose,
+  moveJoint,
   poseWarnings,
   withHandState,
 } from './edit';
-import { deepClone, validPose } from './fixtures';
+import { deepClone, validCurrentPose as validPose } from './fixtures';
 import { currentPoseSchema } from './pose';
 import { STARTER_POSE } from './starter-pose';
 
@@ -85,22 +87,29 @@ describe('clampVec3', () => {
 });
 
 describe('boneLengths', () => {
-  it('gives the 9 bones of the starter pose', () => {
+  it('gives the 18 bones of the starter pose', () => {
     const lengths = boneLengths(STARTER_POSE.fighters.me);
-    expect(Object.keys(lengths)).toHaveLength(9);
-    expect(lengths['neck-hip']).toBe(50);
+    expect(Object.keys(lengths)).toHaveLength(18);
+    expect(lengths['pelvis-chest']).toBeCloseTo(34);
   });
 });
 
 describe('poseWarnings', () => {
   const stretch = (factor: number) => {
     const pose = deepClone(STARTER_POSE);
-    const { elbowL, handL } = pose.fighters.me;
-    pose.fighters.me.handL = [
+    const { elbowL, handL, handTipL } = pose.fighters.me;
+    const moved: [number, number, number] = [
       elbowL[0] + (handL[0] - elbowL[0]) * factor,
       elbowL[1] + (handL[1] - elbowL[1]) * factor,
       elbowL[2] + (handL[2] - elbowL[2]) * factor,
     ];
+    // The fingertips go with the hand: only the forearm changes length.
+    pose.fighters.me.handTipL = [
+      handTipL[0] + moved[0] - handL[0],
+      handTipL[1] + moved[1] - handL[1],
+      handTipL[2] + moved[2] - handL[2],
+    ];
+    pose.fighters.me.handL = moved;
     return pose;
   };
 
@@ -124,5 +133,27 @@ describe('STARTER_POSE', () => {
   it('faces the opponent with correct left/right', () => {
     expect(STARTER_POSE.fighters.opponent.handL[2]).toBe(0 - STARTER_POSE.fighters.me.handL[2]);
     expect(STARTER_POSE.fighters.opponent.head).toEqual([50, 165, 0]);
+  });
+});
+
+describe('moveJoint', () => {
+  const me = STARTER_POSE.fighters.me;
+
+  it('carries the followers by the same offset, and nothing else', () => {
+    const moved = moveJoint(me, 'handL', [me.handL[0] + 10, me.handL[1], me.handL[2]]);
+    expect(moved.handTipL).toEqual([me.handTipL[0] + 10, me.handTipL[1], me.handTipL[2]]);
+    expect(moved.elbowL).toEqual(me.elbowL);
+    expect(moved.handR).toEqual(me.handR);
+    const plain = moveJoint(me, 'elbowL', [0, 100, 0]);
+    expect(plain.handL).toEqual(me.handL);
+  });
+
+  it('keeps everything in bounds and does not mutate its input', () => {
+    const copy = deepClone(me);
+    const moved = moveJoint(me, 'footL', [me.footL[0], -50, me.footL[2]]);
+    expect(moved.footL[1]).toBe(0);
+    expect(moved.toeL[1]).toBeGreaterThanOrEqual(0);
+    expect(me).toEqual(copy);
+    expect(JOINT_FOLLOWERS.pelvis).toEqual(['hipL', 'hipR']);
   });
 });

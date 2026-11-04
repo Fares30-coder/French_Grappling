@@ -1,6 +1,6 @@
 # Blender tools
 
-`tatamap_rig.py` builds, in Blender 5.1+, two fighters whose bones are exactly the v1-11 skeleton
+`tatamap_rig.py` builds, in Blender 5.1+, two fighters posed by the 11 base joints of the skeleton
 (standard body lengths), loads a technique JSON as an animation, writes the poses back, and sets up
 a vertical video (1080x1920, TikTok / Reels).
 
@@ -14,6 +14,7 @@ a vertical video (1080x1920, TikTok / Reels).
 ## Use (Blender Python console, or through the MCP server)
 
 ```python
+import sys; sys.path.insert(0, '/path/to/tools/blender')  # tatamap_pose: the pose format
 exec(open('/path/to/tools/blender/tatamap_rig.py').read())
 build_scene()                                   # mat, me_rig (green), opponent_rig (orange)
 load_technique('content/techniques/<slug>.json')  # one marker "step N" per step
@@ -79,3 +80,11 @@ derived points, rolls or hands here, and port the change. `poses.json` must hold
 
 `python3 tools/blender/transitions.py content/techniques/<slug>.json` lists the limbs that pass
 through each other while the site interpolates between two steps (exit code 1 if any).
+
+## Pose format (v2-21)
+
+Technique files are in skeleton v2-21 (21 points, ADR 0004). `tatamap_pose.py` (pure Python) is
+the format for these scripts: joints, bone chain, `upgrade_pose` (v1-11 files are upgraded on
+load, exactly as `upgradePose` in `@tatamap/shared`) and `interpolate_fighter`. The editing rig
+still poses the 11 base joints: on export, a step left as it was keeps its 21 points; a moved
+step gets the others derived again (refine them in the site editor).

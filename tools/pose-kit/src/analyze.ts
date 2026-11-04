@@ -1,12 +1,13 @@
 import {
-  BONES_V1_11,
+  boneKey,
+  CURRENT_BONES,
+  CURRENT_JOINTS,
+  type CurrentFighterPose,
+  type CurrentJoint,
   type CurrentPose,
   FIGHTERS,
   type FighterId,
-  type FighterPoseV1_11,
   HEAD_RADIUS_CM,
-  JOINTS_V1_11,
-  type JointV1_11,
   type Vec3,
 } from '@tatamap/shared';
 import { add, dot, length, scale, sub } from './vec';
@@ -14,18 +15,24 @@ import { add, dot, length, scale, sub } from './vec';
 /** Radius of the joint spheres in the viewer (FighterMesh.tsx). */
 export const JOINT_RADIUS_CM = 5;
 
+/** Tips that only point a part: they may touch the mat (a toe, fingers posted flat). */
+const isTip = (joint: CurrentJoint): boolean =>
+  joint === 'nose' || joint.startsWith('handTip') || joint.startsWith('toe');
+
 /**
  * Joints that sink into the mat (y = 0): a joint is a sphere (radius JOINT_RADIUS_CM, the head
  * HEAD_RADIUS_CM), so a centre lower than that minus `toleranceCm` is partly hidden by the mat,
- * which shows as clipped hands and feet in the viewer. Rest joints at y >= 6.
+ * which shows as clipped hands and feet in the viewer. Rest joints at y >= 6. Tips (nose,
+ * fingertips, toes) may rest on the mat.
  */
 export function jointsBelowMat(
   pose: CurrentPose,
   toleranceCm = 1,
-): Array<{ fighter: FighterId; joint: JointV1_11; y: number }> {
-  const out: Array<{ fighter: FighterId; joint: JointV1_11; y: number }> = [];
+): Array<{ fighter: FighterId; joint: CurrentJoint; y: number }> {
+  const out: Array<{ fighter: FighterId; joint: CurrentJoint; y: number }> = [];
   for (const fighter of FIGHTERS) {
-    for (const joint of JOINTS_V1_11) {
+    for (const joint of CURRENT_JOINTS) {
+      if (isTip(joint)) continue;
       const y = pose.fighters[fighter][joint][1];
       const floor = (joint === 'head' ? HEAD_RADIUS_CM : JOINT_RADIUS_CM) - toleranceCm;
       if (y < floor) out.push({ fighter, joint, y });
@@ -97,26 +104,27 @@ export type Contact = {
 
 /** Two limb segments closer than this cross (a limb is ~10 cm thick; touching is fine). */
 export const LIMB_CONTACT_CM = 6;
-/** A limb passing this close to the other fighter's spine line (neck-hip) goes through the chest or belly. */
+/** A limb passing this close to the other fighter's spine line (pelvis-chest-neck) goes through the chest or belly. */
 export const TORSO_CONTACT_CM = 8;
 /** A limb passing this close to the other fighter's head centre goes through the head (radius 13). */
 export const HEAD_CONTACT_CM = 8;
 
 type Segment = { name: string; a: Vec3; b: Vec3; torso: boolean };
 
-function segmentsOf(fighter: FighterPoseV1_11): Segment[] {
-  return BONES_V1_11.map(([from, to]) => ({
-    name: `${from}-${to}`,
+function segmentsOf(fighter: CurrentFighterPose): Segment[] {
+  return CURRENT_BONES.map(([from, to]) => ({
+    name: boneKey(from, to),
     a: fighter[from],
     b: fighter[to],
-    torso: from === 'neck' && to === 'hip',
+    // The spine (pelvis -> chest -> neck) stands for the torso.
+    torso: (from === 'pelvis' && to === 'chest') || (from === 'chest' && to === 'neck'),
   }));
 }
 
 /**
  * Rough interpenetration check between the two fighters, on the bare skeleton (no flesh):
  * - limb vs limb closer than LIMB_CONTACT_CM,
- * - any segment vs the other's neck-hip line closer than TORSO_CONTACT_CM,
+ * - any segment vs the other's spine (pelvis-chest, chest-neck) closer than TORSO_CONTACT_CM,
  * - any segment vs the other's head centre closer than HEAD_CONTACT_CM.
  * APPROXIMATE: grips on the collar or a leg wrapped around the waist are legitimate and may be
  * flagged; real overlaps deeper than a few cm are what this is for. Alerts, never errors.
@@ -163,7 +171,7 @@ export function findContacts(pose: CurrentPose): Contact[] {
 
 /** Bounding box centre of all joints of both fighters (to aim axis-aligned cameras). */
 export function poseCenter(pose: CurrentPose): Vec3 {
-  const points = FIGHTERS.flatMap((f) => JOINTS_V1_11.map((j) => pose.fighters[f][j]));
+  const points = FIGHTERS.flatMap((f) => CURRENT_JOINTS.map((j) => pose.fighters[f][j]));
   const min: Vec3 = [Infinity, Infinity, Infinity];
   const max: Vec3 = [-Infinity, -Infinity, -Infinity];
   for (const p of points) {
@@ -175,7 +183,7 @@ export function poseCenter(pose: CurrentPose): Vec3 {
   return [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2];
 }
 
-/** A head bent further than this from the spine line (hip -> neck) is past what a neck does. */
+/** A head bent further than this from the spine line (pelvis -> neck) is past what a neck does. */
 export const MAX_HEAD_BEND_DEG = 60;
 
 /** Fighters whose head is bent more than MAX_HEAD_BEND_DEG from their spine line. */
@@ -183,7 +191,7 @@ export function bentNecks(pose: CurrentPose): Array<{ fighter: FighterId; degree
   const out: Array<{ fighter: FighterId; degrees: number }> = [];
   for (const fighter of FIGHTERS) {
     const f = pose.fighters[fighter];
-    const spine = sub(f.neck, f.hip);
+    const spine = sub(f.neck, f.pelvis);
     const head = sub(f.head, f.neck);
     const cos = dot(spine, head) / (length(spine) * length(head) || 1);
     const degrees = (Math.acos(Math.min(1, Math.max(-1, cos))) * 180) / Math.PI;

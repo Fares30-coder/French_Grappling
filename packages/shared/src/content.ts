@@ -12,6 +12,7 @@ import {
   levelSchema,
   techniqueStatusSchema,
 } from './enums';
+import { poseSchema, upgradePose } from './pose/pose';
 import { END_POSITION_MESSAGE, hasConsistentEndPosition } from './technique';
 
 /**
@@ -25,6 +26,14 @@ export type ContentPosition = z.infer<typeof contentPositionSchema>;
 
 export const contentTagSchema = tagInputSchema;
 export type ContentTag = z.infer<typeof contentTagSchema>;
+
+/**
+ * A step of a content file: its pose may be in any readable skeleton version (files exported
+ * before a bump), and is upgraded to the current one on parse (ADR 0002 D6, ADR 0004).
+ */
+export const contentStepSchema = stepInputSchema.extend({
+  pose: poseSchema.transform(upgradePose),
+});
 
 export const contentChainSchema = z.strictObject({ to: slugSchema, type: chainTypeSchema });
 export type ContentChain = z.infer<typeof contentChainSchema>;
@@ -43,7 +52,7 @@ export const contentTechniqueSchema = z
     keyPoints: z.array(listItemInputSchema).max(20),
     commonMistakes: z.array(listItemInputSchema).max(20),
     tags: z.array(slugSchema).max(20),
-    steps: z.array(stepInputSchema).min(1).max(40),
+    steps: z.array(contentStepSchema).min(1).max(40),
     chains: z.array(contentChainSchema).max(30),
   })
   .refine((t) => hasConsistentEndPosition(t.category, t.endPosition !== null), {

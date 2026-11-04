@@ -1,11 +1,12 @@
-import type { CurrentPose, FighterId, FighterPoseV1_11 } from '@tatamap/shared';
+import type { CurrentFighterPose, CurrentPose, FighterId } from '@tatamap/shared';
 import { Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import { type BoneFrames, boneFrames, type RigState } from './rig';
 import fixture from './rig.fixture.json';
 
-// Bone frames computed by Blender (tools/blender/rig_fixture.py) on the scissor sweep seed poses:
-// the site and the videos must pose the model the same way.
+// Bone frames computed by Blender (tools/blender/rig_fixture.py) on the scissor sweep seed poses,
+// upgraded to v2-21 there (tatamap_pose.upgrade_pose): the site and the videos must pose the model
+// the same way.
 type Frame = [number[], number[], number[]];
 type Fixture = {
   poses: CurrentPose[];
@@ -13,8 +14,8 @@ type Fixture = {
   sequence: {
     fps: number;
     frames: Array<{
-      me: FighterPoseV1_11;
-      opponent: FighterPoseV1_11;
+      me: CurrentFighterPose;
+      opponent: CurrentFighterPose;
       bones: Record<string, Frame>;
     }>;
   };
@@ -79,7 +80,7 @@ describe('boneFrames (parity with the Blender mannequin)', () => {
 describe('boneFrames', () => {
   const pose = data.poses[0] as CurrentPose;
 
-  it('follows the joints: each limb bone ends on its v1-11 point', () => {
+  it('follows the joints: each limb bone ends on its point', () => {
     const { bones } = boneFrames(pose.fighters.me);
     const f = pose.fighters.me;
     expect(bones.get('forearm.L')?.head.distanceTo(new Vector3(...f.elbowL))).toBeCloseTo(0);

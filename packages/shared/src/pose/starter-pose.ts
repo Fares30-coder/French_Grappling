@@ -1,10 +1,11 @@
 import { DEFAULT_CAMERA } from '../defaults';
 import type { CurrentPose } from './pose';
 import type { FighterPoseV1_11, Vec3 } from './skeleton-v1-11';
+import { upgradeV1toV2 } from './upgrade-v1-v2';
 
 /**
- * `me`, standing and facing +x (his left side is towards -z), centred at x = -50. Bone lengths
- * follow STANDARD_BODY_V1_11.
+ * `me`, standing and facing +x (his left side is towards -z), centred at x = -50. Written in
+ * v1-11 and upgraded: the derived points (shoulders, hip joints, hands, feet) follow.
  */
 const me: FighterPoseV1_11 = {
   head: [-50, 165, 0],
@@ -38,8 +39,8 @@ const opponent: FighterPoseV1_11 = {
 };
 
 /** Two fighters standing face to face; the first step of a new technique. */
-export const STARTER_POSE: CurrentPose = {
+export const STARTER_POSE: CurrentPose = upgradeV1toV2({
   skeleton: 'v1-11',
   fighters: { me, opponent },
   camera: { position: [...DEFAULT_CAMERA.position], target: [...DEFAULT_CAMERA.target] },
-};
+});

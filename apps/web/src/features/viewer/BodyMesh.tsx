@@ -1,8 +1,8 @@
 import { useGLTF } from '@react-three/drei';
 import {
+  type CurrentFighterPose,
   FIGHTER_COLORS,
   type FighterId,
-  type FighterPoseV1_11,
   type HandState,
 } from '@tatamap/shared';
 import { type Ref, useImperativeHandle, useLayoutEffect, useMemo, useRef } from 'react';
@@ -23,12 +23,12 @@ export const BODY_MODEL_URL = '/models/fighter.v1.glb';
 
 /** What else a body needs to pose its hands: the opponent (automatic grips) and the step's hands. */
 export type PoseContext = {
-  other?: FighterPoseV1_11 | undefined;
+  other?: CurrentFighterPose | undefined;
   hands?: Partial<Record<'L' | 'R', HandState>> | undefined;
 };
 
 export type BodyMeshHandle = {
-  setPose: (pose: FighterPoseV1_11, context?: PoseContext) => void;
+  setPose: (pose: CurrentFighterPose, context?: PoseContext) => void;
 };
 
 /** Longer than this between two poses is not playback: the body jumps instead of turning. */
@@ -42,7 +42,7 @@ type Props = {
   /** Editor: see-through, so the joint spheres inside stay visible. */
   translucent?: boolean;
   /** The pose to show when the body appears (the model loads after the first poses). */
-  initialPose?: () => { pose: FighterPoseV1_11; context?: PoseContext } | null;
+  initialPose?: () => { pose: CurrentFighterPose; context?: PoseContext } | null;
   /** Called once the body is on screen (the model is loaded). */
   onReady?: () => void;
 };

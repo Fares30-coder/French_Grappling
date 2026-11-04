@@ -1,15 +1,17 @@
 import {
+  type CurrentPose,
   currentPoseSchema,
   DEFAULT_CAMERA,
   type FighterPoseV1_11,
   fighterPoseV1_11Schema,
   JOINTS_V1_11,
-  type PoseV1_11,
+  poseV1_11Schema,
+  upgradePose,
 } from '@tatamap/shared';
 
 // Prototype data kept ONLY as a seed fixture (the seed tests depend on it). The source of truth
 // for content is the private `content/` repo, and these poses, placed by eye, do NOT follow the
-// standard body (STANDARD_BODY_V1_11 in @tatamap/shared): expect bone-length warnings on them.
+// standard body (STANDARD_BODY_V2_21 in @tatamap/shared): expect bone-length warnings on them.
 // `me` is also a mirror image in steps 1-4 (L joints on his right, see mirroredFighters).
 //
 // Raw prototype data (CLAUDE.md, "Données du prototype"). 2D: SVG coordinates, y pointing down,
@@ -185,8 +187,8 @@ function at<T>(list: ReadonlyArray<T>, index: number): T {
   return item;
 }
 
-/** The 5 poses of the scissor sweep, validated against the current skeleton. */
-export function buildScissorPoses(): PoseV1_11[] {
+/** The 5 poses of the scissor sweep: written in v1-11, upgraded to the current skeleton. */
+export function buildScissorPoses(): CurrentPose[] {
   const me3d = ME_2D.map(convert2dTo3d);
   const opp3d = OPP_2D.map(convert2dTo3d);
 
@@ -202,11 +204,15 @@ export function buildScissorPoses(): PoseV1_11[] {
   ];
 
   return fighters.map(([me, opponent]) =>
-    currentPoseSchema.parse({
-      skeleton: 'v1-11',
-      fighters: { me: toFighter(me), opponent: toFighter(opponent) },
-      camera: structuredClone(DEFAULT_CAMERA),
-    }),
+    currentPoseSchema.parse(
+      upgradePose(
+        poseV1_11Schema.parse({
+          skeleton: 'v1-11',
+          fighters: { me: toFighter(me), opponent: toFighter(opponent) },
+          camera: structuredClone(DEFAULT_CAMERA),
+        }),
+      ),
+    ),
   );
 }
 
