@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { type ContentTechnique, contentTechniqueSchema, slugSchema } from '@tatamap/shared';
 
@@ -23,6 +23,15 @@ export function resolveTechniqueFile(arg: string): string {
   const slug = slugSchema.safeParse(arg);
   if (!slug.success) throw new Error(`"${arg}" is neither a valid slug nor a .json path`);
   return path.join(contentDir(), 'techniques', `${slug.data}.json`);
+}
+
+/** Every technique file of `<CONTENT_DIR>/techniques`, sorted. */
+export function listTechniqueFiles(): string[] {
+  const dir = path.join(contentDir(), 'techniques');
+  return readdirSync(dir)
+    .filter((name) => name.endsWith('.json'))
+    .sort()
+    .map((name) => path.join(dir, name));
 }
 
 export type LoadResult =

@@ -23,7 +23,7 @@ describe('scissor sweep seed data', () => {
   });
 
   it('step 4: me is shifted by +18 in z', () => {
-    expect(pose(3).fighters.me.hip).toEqual([0, 21, 18]);
+    expect(pose(3).fighters.me.pelvis).toEqual([0, 21, 18]);
   });
 
   it('step 4: opponent is tilted by 55 degrees and rests at y = 6', () => {
@@ -34,7 +34,15 @@ describe('scissor sweep seed data', () => {
     expect(opponent.footL[0]).toBeCloseTo(72, 1);
     expect(opponent.footL[1]).toBeCloseTo(6, 1);
     expect(opponent.footL[2]).toBeCloseTo(15.7, 1);
-    expect(Math.min(...Object.values(opponent).map((p) => p[1]))).toBe(6);
+    // The prototype's points (the derived ones, toes and hip joints, may go lower).
+    const prototype = [
+      opponent.head,
+      opponent.neck,
+      opponent.pelvis,
+      opponent.footL,
+      opponent.footR,
+    ];
+    expect(Math.min(...prototype.map((p) => p[1]))).toBe(6);
   });
 
   it('every pose passes currentPoseSchema and carries the camera', () => {

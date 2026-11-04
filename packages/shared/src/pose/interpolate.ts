@@ -1,5 +1,11 @@
-import type { CurrentPose } from './pose';
-import { FIGHTERS, type FighterPoseV1_11, type JointV1_11, type Vec3 } from './skeleton-v1-11';
+import {
+  CURRENT_BONE_CHAIN,
+  CURRENT_ROOT_JOINT,
+  type CurrentFighterPose,
+  type CurrentJoint,
+  type CurrentPose,
+} from './pose';
+import { FIGHTERS, type Vec3 } from './skeleton-v1-11';
 
 /** Ease in/out; `t` is clamped to [0, 1]. */
 export function smoothstep(t: number): number {
@@ -46,36 +52,20 @@ export function slerpUnit(a: Vec3, b: Vec3, t: number): Vec3 {
 }
 
 /**
- * Bones from the root outwards, each [parent, child]: the hip is the root, the head hangs off
- * the neck. Every joint except the hip appears exactly once as a child.
- */
-export const BONE_CHAIN_V1_11 = [
-  ['hip', 'neck'],
-  ['neck', 'head'],
-  ['neck', 'elbowL'],
-  ['elbowL', 'handL'],
-  ['neck', 'elbowR'],
-  ['elbowR', 'handR'],
-  ['hip', 'kneeL'],
-  ['kneeL', 'footL'],
-  ['hip', 'kneeR'],
-  ['kneeR', 'footR'],
-] as const satisfies ReadonlyArray<readonly [JointV1_11, JointV1_11]>;
-
-/**
- * Interpolates the hip linearly, then each bone's direction along a great circle and its length
+ * Interpolates the root (pelvis) linearly, then each bone of CURRENT_BONE_CHAIN: its direction along a great circle and its length
  * linearly. Moving joints in straight lines instead shortens a limb mid-transition (the hand cuts
  * the corner when the arm swings); this way a limb keeps its length and swings. No joint goes
  * lower than at both steps (the arc would go through the mat): there, its bone stretches a little.
  */
 export function interpolateFighter(
-  a: FighterPoseV1_11,
-  b: FighterPoseV1_11,
+  a: CurrentFighterPose,
+  b: CurrentFighterPose,
   s: number,
-): FighterPoseV1_11 {
-  // Filled bone by bone below (the hip first, every other joint once), so the cast is safe.
-  const out = { hip: lerpVec3(a.hip, b.hip, s) } as Record<JointV1_11, Vec3>;
-  for (const [parent, child] of BONE_CHAIN_V1_11) {
+): CurrentFighterPose {
+  // Filled bone by bone below (the root first, every other joint once), so the cast is safe.
+  const root = CURRENT_ROOT_JOINT;
+  const out = { [root]: lerpVec3(a[root], b[root], s) } as Record<CurrentJoint, Vec3>;
+  for (const [parent, child] of CURRENT_BONE_CHAIN) {
     const boneA = sub(a[child], a[parent]);
     const boneB = sub(b[child], b[parent]);
     const lengthA = norm(boneA);

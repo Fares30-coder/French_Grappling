@@ -1,13 +1,13 @@
 import type { ThreeEvent } from '@react-three/fiber';
 import { useThree } from '@react-three/fiber';
 import {
-  BONES_V1_11,
+  CURRENT_BONES,
+  CURRENT_JOINTS,
+  type CurrentFighterPose,
+  type CurrentJoint,
   FIGHTER_COLORS,
   type FighterId,
-  type FighterPoseV1_11,
   HEAD_RADIUS_CM,
-  JOINTS_V1_11,
-  type JointV1_11,
 } from '@tatamap/shared';
 import {
   Component,
@@ -26,6 +26,14 @@ import { type Mesh, Quaternion, Vector3 } from 'three';
 import { BodyMesh, type BodyMeshHandle, type PoseContext } from './BodyMesh';
 
 const JOINT_RADIUS_CM = 5;
+/** Tips that only point a part (nose, fingertips, toes): smaller spheres. */
+const TIP_RADIUS_CM = 3;
+const radiusOf = (joint: CurrentJoint): number =>
+  joint === 'head'
+    ? HEAD_RADIUS_CM
+    : joint === 'nose' || joint.startsWith('handTip') || joint.startsWith('toe')
+      ? TIP_RADIUS_CM
+      : JOINT_RADIUS_CM;
 const BONE_RADIUS_CM = 4;
 const UP = new Vector3(0, 1, 0);
 
@@ -34,10 +42,10 @@ export type FighterMeshHandle = {
    * Moves the fighter to `pose`. Imperative on purpose: no React state per frame. `context`
    * (the opponent, the step's hands) shapes the body's hands.
    */
-  setPose: (pose: FighterPoseV1_11, context?: PoseContext) => void;
+  setPose: (pose: CurrentFighterPose, context?: PoseContext) => void;
 };
 
-type StickHandle = { setPose: (pose: FighterPoseV1_11) => void };
+type StickHandle = { setPose: (pose: CurrentFighterPose) => void };
 
 const GHOST_OPACITY = 0.25;
 const SELECTED_SCALE = 1.4;
@@ -48,12 +56,12 @@ type Props = {
   /** 'ghost': translucent "onion skin", never pickable, always sticks. */
   variant?: 'solid' | 'ghost';
   /** Editor: when set, joint spheres are pickable. Absent on the public site (no picking, no hand cursor). */
-  onJointPointerDown?: (joint: JointV1_11) => void;
+  onJointPointerDown?: (joint: CurrentJoint) => void;
   /** Editor: joint of this fighter to highlight. */
-  selectedJoint?: JointV1_11 | null;
+  selectedJoint?: CurrentJoint | null;
 };
 
-type LastPose = { pose: FighterPoseV1_11; context?: PoseContext };
+type LastPose = { pose: CurrentFighterPose; context?: PoseContext };
 
 /**
  * A fighter: the humanoid body (BodyMesh), with the joint spheres on top in the editor. Sticks
@@ -142,8 +150,8 @@ type StickProps = {
   fighter: FighterId;
   ref?: Ref<StickHandle>;
   ghost: boolean;
-  onJointPointerDown?: ((joint: JointV1_11) => void) | undefined;
-  selectedJoint: JointV1_11 | null;
+  onJointPointerDown?: ((joint: CurrentJoint) => void) | undefined;
+  selectedJoint: CurrentJoint | null;
   initialPose: () => LastPose | null;
   spheresOnly: boolean;
 };
@@ -163,7 +171,7 @@ function Sticks({
   initialPose,
   spheresOnly,
 }: StickProps) {
-  const jointRefs = useRef(new Map<JointV1_11, Mesh>());
+  const jointRefs = useRef(new Map<CurrentJoint, Mesh>());
   const boneRefs = useRef<Array<Mesh | null>>([]);
   const color = FIGHTER_COLORS[fighter];
   const pickable = !ghost && onJointPointerDown !== undefined;
@@ -182,12 +190,12 @@ function Sticks({
   const handle: StickHandle = useMemo(
     () => ({
       setPose(pose) {
-        for (const joint of JOINTS_V1_11) {
+        for (const joint of CURRENT_JOINTS) {
           const mesh = jointRefs.current.get(joint);
           const p = pose[joint];
           mesh?.position.set(p[0], p[1], p[2]);
         }
-        BONES_V1_11.forEach(([a, b], i) => {
+        CURRENT_BONES.forEach(([a, b], i) => {
           const bone = boneRefs.current[i];
           if (!bone) return;
           const pa = pose[a];
@@ -214,7 +222,7 @@ function Sticks({
 
   return (
     <group>
-      {JOINTS_V1_11.map((joint) => {
+      {CURRENT_JOINTS.map((joint) => {
         const selected = joint === selectedJoint;
         // Handlers are only passed when pickable, so the public viewer registers no pointer events.
         const jointEvents = pickable
@@ -245,7 +253,7 @@ function Sticks({
             scale={selected ? SELECTED_SCALE : 1}
             {...jointEvents}
           >
-            <sphereGeometry args={[joint === 'head' ? HEAD_RADIUS_CM : JOINT_RADIUS_CM, 24, 16]} />
+            <sphereGeometry args={[radiusOf(joint), 24, 16]} />
             <meshStandardMaterial
               color={color}
               emissive={selected ? color : '#000000'}
@@ -255,7 +263,7 @@ function Sticks({
           </mesh>
         );
       })}
-      {BONES_V1_11.map(([a, b], i) => (
+      {CURRENT_BONES.map(([a, b], i) => (
         <mesh
           visible={!spheresOnly}
           key={`${a}-${b}`}

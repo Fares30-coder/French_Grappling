@@ -15,15 +15,18 @@
     "admin:create": "pnpm --filter @tatamap/api exec tsx scripts/create-admin.ts",
     "content:export": "pnpm --filter @tatamap/api exec tsx scripts/content-export.ts",
     "content:import": "pnpm --filter @tatamap/api exec tsx scripts/content-import.ts",
+    "content:upgrade": "pnpm --filter @tatamap/api exec tsx scripts/content-upgrade.ts",
     "db:up": "docker compose up -d --wait db",
     "db:down": "docker compose down",
     "db:generate": "pnpm --filter @tatamap/api exec prisma generate",
     "db:migrate": "pnpm --filter @tatamap/api exec prisma migrate dev",
     "db:reset": "pnpm --filter @tatamap/api exec prisma migrate reset --force",
     "db:seed": "pnpm --filter @tatamap/api exec prisma db seed",
+    "db:migrate-poses": "pnpm --filter @tatamap/api exec tsx scripts/migrate-poses.ts",
     "db:test:reset": "PRISMA_TARGET=test pnpm --filter @tatamap/api exec prisma migrate reset --force",
     "pose:check": "pnpm --filter @tatamap/pose-kit exec tsx src/cli/check.ts",
     "pose:separate": "pnpm --filter @tatamap/pose-kit exec tsx src/cli/separate.ts",
+    "pose:legs": "pnpm --filter @tatamap/pose-kit exec tsx src/cli/legs.ts",
     "pose:render": "pnpm --filter @tatamap/pose-kit exec tsx src/cli/render.ts"
   },
   "devDependencies": {

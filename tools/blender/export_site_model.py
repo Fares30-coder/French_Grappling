@@ -15,6 +15,7 @@ import sys
 import bpy
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
 exec(open(os.path.join(HERE, 'tatamap_rig.py')).read())
 exec(open(os.path.join(HERE, 'tatamap_humanoid.py')).read())
 

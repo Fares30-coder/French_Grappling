@@ -1,17 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { deepClone, validPose } from './fixtures';
+import { deepClone, validCurrentPose, validPose } from './fixtures';
 import { currentPoseSchema, poseSchema, upgradePose } from './pose';
 import {
   BONES_V1_11,
   fighterPoseV1_11Schema,
   JOINTS_V1_11,
-  type PoseV1_11,
+  poseV1_11Schema,
 } from './skeleton-v1-11';
+import {
+  BONE_CHAIN_V2_21,
+  BONES_V2_21,
+  fighterPoseV2_21Schema,
+  JOINTS_V2_21,
+  MIRRORED_JOINT_V2_21,
+  type PoseV2_21,
+} from './skeleton-v2-21';
 
-const clone = (): PoseV1_11 => deepClone(validPose);
+const clone = (): PoseV2_21 => deepClone(validCurrentPose);
 // Mutable loose view used to build invalid inputs on purpose.
 type Loose = { skeleton: string; fighters: Record<string, Record<string, unknown>> };
-const loose = (): Loose => deepClone(validPose) as unknown as Loose;
+const loose = (): Loose => deepClone(validCurrentPose) as unknown as Loose;
 
 describe('skeleton v1-11', () => {
   it('fighter schema keys equal JOINTS_V1_11, in order', () => {
@@ -25,11 +33,49 @@ describe('skeleton v1-11', () => {
     }
     expect(BONES_V1_11).toHaveLength(9);
   });
+
+  it('is still readable from storage', () => {
+    expect(poseV1_11Schema.safeParse(validPose).success).toBe(true);
+    expect(poseSchema.safeParse(validPose).success).toBe(true);
+    expect(currentPoseSchema.safeParse(validPose).success).toBe(false);
+  });
+});
+
+describe('skeleton v2-21', () => {
+  it('fighter schema keys equal JOINTS_V2_21, in order', () => {
+    expect(Object.keys(fighterPoseV2_21Schema.shape)).toEqual([...JOINTS_V2_21]);
+    expect(JOINTS_V2_21).toHaveLength(21);
+  });
+
+  it('every bone references existing joints', () => {
+    for (const [a, b] of BONES_V2_21) {
+      expect(JOINTS_V2_21).toContain(a);
+      expect(JOINTS_V2_21).toContain(b);
+    }
+  });
+
+  it('the bone chain reaches every joint once, parents first, from the pelvis', () => {
+    const reached = new Set<string>(['pelvis']);
+    for (const [parent, child] of BONE_CHAIN_V2_21) {
+      expect(reached.has(parent)).toBe(true);
+      expect(reached.has(child)).toBe(false);
+      reached.add(child);
+    }
+    expect([...reached].sort()).toEqual([...JOINTS_V2_21].sort());
+  });
+
+  it('left/right counterparts are an involution', () => {
+    for (const joint of JOINTS_V2_21) {
+      expect(MIRRORED_JOINT_V2_21[MIRRORED_JOINT_V2_21[joint]]).toBe(joint);
+    }
+    expect(MIRRORED_JOINT_V2_21.handTipL).toBe('handTipR');
+    expect(MIRRORED_JOINT_V2_21.pelvis).toBe('pelvis');
+  });
 });
 
 describe('currentPoseSchema', () => {
   it('accepts a valid pose', () => {
-    expect(currentPoseSchema.safeParse(validPose).success).toBe(true);
+    expect(currentPoseSchema.safeParse(validCurrentPose).success).toBe(true);
   });
 
   it('accepts a pose without camera', () => {
@@ -45,7 +91,7 @@ describe('currentPoseSchema', () => {
 
   it('rejects an unknown joint', () => {
     const p = loose();
-    (p.fighters.me as Record<string, unknown>).shoulderL = [0, 100, 0];
+    (p.fighters.me as Record<string, unknown>).hip = [0, 100, 0];
     expect(currentPoseSchema.safeParse(p).success).toBe(false);
   });
 
@@ -57,7 +103,7 @@ describe('currentPoseSchema', () => {
 
   it('rejects NaN', () => {
     const p = clone();
-    p.fighters.me.hip = [Number.NaN, 10, 0];
+    p.fighters.me.pelvis = [Number.NaN, 10, 0];
     expect(currentPoseSchema.safeParse(p).success).toBe(false);
   });
 
@@ -100,8 +146,14 @@ describe('currentPoseSchema', () => {
 });
 
 describe('upgradePose', () => {
-  it('returns a v1-11 pose unchanged', () => {
-    const parsed = poseSchema.parse(validPose);
-    expect(upgradePose(parsed)).toEqual(validPose);
+  it('returns a current pose unchanged', () => {
+    const parsed = poseSchema.parse(validCurrentPose);
+    expect(upgradePose(parsed)).toEqual(validCurrentPose);
+  });
+
+  it('upgrades a v1-11 pose to a valid current pose', () => {
+    const upgraded = upgradePose(poseSchema.parse(validPose));
+    expect(upgraded.skeleton).toBe('v2-21');
+    expect(currentPoseSchema.safeParse(upgraded).success).toBe(true);
   });
 });

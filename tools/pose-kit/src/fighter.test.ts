@@ -1,9 +1,11 @@
 import {
   boneLengths,
+  CURRENT_JOINTS,
+  type CurrentFighterPose,
   type FighterPoseV1_11,
-  JOINTS_V1_11,
   mirrorPose,
   standardBodyWarnings,
+  upgradeFighterV1toV2,
 } from '@tatamap/shared';
 import { describe, expect, it } from 'vitest';
 import { findContacts, jointsBelowMat, segmentDistance } from './analyze';
@@ -18,8 +20,21 @@ import {
 } from './fighter';
 import { distance } from './vec';
 
-// Same shape as a real step 1 (closed guard), coordinates in cm.
-const ref: FighterPoseV1_11 = {
+describe('buildFighter (v2-21 points)', () => {
+  it('puts the shoulders and hip joints on the torso, the tips on their limbs', () => {
+    const f = buildFighter(STANDARD_LENGTHS, spec);
+    for (const s of ['L', 'R'] as const) {
+      expect(distance(f[`shoulder${s}`], f.neck)).toBeCloseTo(Math.hypot(17, 5), 0);
+      expect(distance(f[`hip${s}`], f.pelvis)).toBeCloseTo(Math.hypot(9, 5), 0);
+      expect(distance(f[`hand${s}`], f[`handTip${s}`])).toBeCloseTo(8, 0);
+      expect(distance(f[`foot${s}`], f[`toe${s}`])).toBeCloseTo(15, 0);
+    }
+    expect(distance(f.head, f.nose)).toBeCloseTo(11, 0);
+  });
+});
+
+// Same shape as a real step 1 (closed guard), coordinates in cm, written in v1-11.
+const refV1: FighterPoseV1_11 = {
   head: [-150, 24, 0],
   neck: [-125, 21, 0],
   hip: [-30, 18, 0],
@@ -32,10 +47,11 @@ const ref: FighterPoseV1_11 = {
   kneeR: [15, 50, -16],
   footR: [45, 34, -16],
 };
+const ref = upgradeFighterV1toV2(refV1);
 const lengths = boneLengthsOf(ref);
 
 const spec: FighterSpec = {
-  hip: [0, 40, 0],
+  pelvis: [0, 40, 0],
   torsoDir: [0, 1, 0.2],
   headDir: [0, 1, 0],
   hands: {
@@ -51,10 +67,9 @@ const spec: FighterSpec = {
 describe('buildFighter', () => {
   it('keeps every reference length', () => {
     const built = buildFighter(lengths, spec);
-    const got = boneLengths(built);
-    const want = boneLengths(ref);
-    for (const key of Object.keys(want) as Array<keyof typeof want>) {
-      expect(Math.abs(got[key] - want[key])).toBeLessThan(0.2); // 0.1 cm rounding per joint
+    const got = boneLengthsOf(built);
+    for (const key of Object.keys(lengths) as Array<keyof typeof lengths>) {
+      expect(Math.abs(got[key] - lengths[key]), key).toBeLessThan(0.2); // 0.1 cm rounding per joint
     }
     expect(Math.abs(distance(built.neck, built.head) - lengths.neckHead)).toBeLessThan(0.2);
   });
@@ -75,7 +90,7 @@ describe('rotate / translate', () => {
   it('rotateFighterX preserves lengths and rests on yMin', () => {
     const built = buildFighter(lengths, spec);
     const turned = rotateFighterX(built, 55, 6);
-    expect(Math.min(...JOINTS_V1_11.map((j) => turned[j][1]))).toBeCloseTo(6, 5);
+    expect(Math.min(...CURRENT_JOINTS.map((j) => turned[j][1]))).toBeCloseTo(6, 5);
     const a = boneLengths(built);
     const b = boneLengths(turned);
     for (const key of Object.keys(a) as Array<keyof typeof a>) {
@@ -87,17 +102,17 @@ describe('rotate / translate', () => {
     const f = translateFighter(buildFighter(lengths, spec), [0, 0, 0]);
     const turned = rotateFighterX(f, 90, 0); // lifted: y would go negative otherwise
     expect(
-      turned.head[1] - Math.min(...JOINTS_V1_11.map((j) => turned[j][1])),
+      turned.head[1] - Math.min(...CURRENT_JOINTS.map((j) => turned[j][1])),
     ).toBeGreaterThanOrEqual(0);
     // Right-hand rule: y' = -z and z' = y (before any lift, so compare differences).
-    expect(turned.head[2] - turned.hip[2]).toBeCloseTo(f.head[1] - f.hip[1], 0);
-    expect(turned.head[1] - turned.hip[1]).toBeCloseTo(-(f.head[2] - f.hip[2]), 0);
+    expect(turned.head[2] - turned.pelvis[2]).toBeCloseTo(f.head[1] - f.pelvis[1], 0);
+    expect(turned.head[1] - turned.pelvis[1]).toBeCloseTo(-(f.head[2] - f.pelvis[2]), 0);
   });
 
   it('translateFighter moves every joint', () => {
     const f = buildFighter(lengths, spec);
     const moved = translateFighter(f, [10, 0, -5]);
-    expect(moved.hip[0]).toBeCloseTo(f.hip[0] + 10, 5);
+    expect(moved.pelvis[0]).toBeCloseTo(f.pelvis[0] + 10, 5);
     expect(moved.footL[2]).toBeCloseTo(f.footL[2] - 5, 5);
   });
 });
@@ -106,7 +121,7 @@ describe('analysis', () => {
   it('flags joints under the mat', () => {
     const f = buildFighter(lengths, spec);
     // Built by hand: the editor helpers clamp into the schema bounds, which already forbid y < 0.
-    const sunk = { ...f, handL: [0, -3, 0] as FighterPoseV1_11['handL'] };
+    const sunk = { ...f, handL: [0, -3, 0] as CurrentFighterPose['handL'] };
     const pose = makePose(sunk, f);
     expect(jointsBelowMat(pose)).toEqual([{ fighter: 'me', joint: 'handL', y: -3 }]);
     const buried = makePose({ ...f, head: [0, 5, 0] }, f);

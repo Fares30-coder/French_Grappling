@@ -1,12 +1,11 @@
 import {
-  BONES_V1_11,
+  CURRENT_BONES,
+  CURRENT_JOINTS,
+  type CurrentJoint,
   type CurrentPose,
   FIGHTERS,
   type FighterId,
-  type FighterPoseV1_11,
   HEAD_RADIUS_CM,
-  JOINTS_V1_11,
-  type JointV1_11,
   mirroredFighters,
   type Vec3,
 } from '@tatamap/shared';
@@ -31,10 +30,19 @@ export type SeparateOptions = {
   maxMoveCm?: number;
 };
 
-type Joints = Record<FighterId, Record<JointV1_11, Vec3>>;
+type Joints = Record<FighterId, Record<CurrentJoint, Vec3>>;
 
-/** Every length to keep: the drawn bones and neck -> head (the head is not a drawn bone). */
-const BONES: ReadonlyArray<readonly [JointV1_11, JointV1_11]> = [...BONES_V1_11, ['neck', 'head']];
+/**
+ * Every length to keep: the drawn bones, neck -> head -> nose (the head is not a drawn bone),
+ * and the spans across the shoulders and the hip joints, so the torso stays in one piece.
+ */
+const BONES: ReadonlyArray<readonly [CurrentJoint, CurrentJoint]> = [
+  ...CURRENT_BONES,
+  ['neck', 'head'],
+  ['head', 'nose'],
+  ['shoulderL', 'shoulderR'],
+  ['hipL', 'hipR'],
+];
 
 /**
  * Default cap on how far a joint moves. A limb that changes sides of another between two steps
@@ -65,7 +73,7 @@ export function separateTechnique(
   const maxMove = options.maxMoveCm ?? MAX_MOVE_CM;
   const original = poses.map((p) => clone(p));
   const joints: Joints[] = poses.map((p) => clone(p).fighters);
-  const floor = (step: number, f: FighterId, j: JointV1_11) =>
+  const floor = (step: number, f: FighterId, j: CurrentJoint) =>
     Math.min(
       original[step]?.fighters[f][j][1] ?? 0,
       (j === 'head' ? HEAD_RADIUS_CM : JOINT_RADIUS_CM) + 1,
@@ -92,7 +100,7 @@ export function separateTechnique(
       const [one, two] = hit.sides;
       let normal = pushDirection(one, two);
       if (distance(normal, [0, 0, 0]) < 1e-6) {
-        normal = sub(pose.fighters[two.fighter].hip, pose.fighters[one.fighter].hip);
+        normal = sub(pose.fighters[two.fighter].pelvis, pose.fighters[one.fighter].pelvis);
       }
       normal = unit(normal);
       // Half the excess each side, damped: many pairs push on the same joints at once.
@@ -142,7 +150,7 @@ export function separateTechnique(
         }
       }
       for (const f of FIGHTERS) {
-        for (const j of JOINTS_V1_11) {
+        for (const j of CURRENT_JOINTS) {
           const p = fighters[f][j];
           const home = rest.fighters[f][j];
           let back = add(p, scale(sub(home, p), 0.01));
@@ -161,7 +169,7 @@ export function separateTechnique(
       fighters: Object.fromEntries(
         FIGHTERS.map((f) => [
           f,
-          Object.fromEntries(JOINTS_V1_11.map((j) => [j, round(fighters[f][j])])),
+          Object.fromEntries(CURRENT_JOINTS.map((j) => [j, round(fighters[f][j])])),
         ]),
       ) as CurrentPose['fighters'],
     };
@@ -173,14 +181,20 @@ export function separateTechnique(
     }
     // Pushes on the head can fold it on the neck (and an original pose may already be): bring it
     // back within what a neck does.
-    for (const f of FIGHTERS) after.fighters[f].head = unbendHead(after.fighters[f]);
+    for (const f of FIGHTERS) {
+      const fighter = after.fighters[f];
+      const head = unbendHead(fighter);
+      // The nose turns with the head (same offset from the head centre).
+      fighter.nose = round(add(head, sub(fighter.nose, fighter.head)));
+      fighter.head = head;
+    }
     return after;
   });
 }
 
 /** The head turned towards the spine line, in their plane, to at most MAX_HEAD_BEND_DEG - 2. */
-function unbendHead(f: FighterPoseV1_11): Vec3 {
-  const spine = unit(sub(f.neck, f.hip));
+function unbendHead(f: CurrentPose['fighters']['me']): Vec3 {
+  const spine = unit(sub(f.neck, f.pelvis));
   const head = sub(f.head, f.neck);
   const length = distance(f.head, f.neck);
   const along = unit(head);

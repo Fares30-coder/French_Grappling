@@ -4,11 +4,10 @@ import {
   HAND_STATE_LABELS_FR,
   HAND_STATES,
   type HandState,
-  JOINTS_V1_11,
   type Vec3,
 } from '@tatamap/shared';
 import type { JointRef } from './editor-state';
-import { FIGHTER_LABELS_FR, JOINT_LABELS_FR } from './labels';
+import { FIGHTER_LABELS_FR, JOINT_GROUPS_FR, JOINT_LABELS_FR } from './labels';
 
 type Props = {
   selected: JointRef | null;
@@ -54,24 +53,29 @@ export function JointPanel({
       {FIGHTERS.map((fighter) => (
         <fieldset key={fighter} className="space-y-1">
           <legend className="text-sm font-medium">{FIGHTER_LABELS_FR[fighter]}</legend>
-          <div className="flex flex-wrap gap-1">
-            {JOINTS_V1_11.map((joint) => {
-              const isSelected = selected?.fighter === fighter && selected.joint === joint;
-              return (
-                <button
-                  key={joint}
-                  type="button"
-                  aria-pressed={isSelected}
-                  className={`rounded border px-2 py-1 text-xs ${FIGHTER_COLOR[fighter]} ${
-                    isSelected ? 'bg-slate-800 text-white' : 'bg-white'
-                  }`}
-                  onClick={() => onSelect({ fighter, joint })}
-                >
-                  {JOINT_LABELS_FR[joint]}
-                </button>
-              );
-            })}
-          </div>
+          {JOINT_GROUPS_FR.map(([group, joints]) => (
+            <fieldset key={group}>
+              <legend className="text-xs text-slate-600">{group}</legend>
+              <div className="flex flex-wrap gap-1">
+                {joints.map((joint) => {
+                  const isSelected = selected?.fighter === fighter && selected.joint === joint;
+                  return (
+                    <button
+                      key={joint}
+                      type="button"
+                      aria-pressed={isSelected}
+                      className={`rounded border px-2 py-1 text-xs ${FIGHTER_COLOR[fighter]} ${
+                        isSelected ? 'bg-slate-800 text-white' : 'bg-white'
+                      }`}
+                      onClick={() => onSelect({ fighter, joint })}
+                    >
+                      {JOINT_LABELS_FR[joint]}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+          ))}
         </fieldset>
       ))}
 

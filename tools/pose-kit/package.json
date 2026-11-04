@@ -2,7 +2,7 @@
   "name": "@tatamap/pose-kit",
   "private": true,
   "type": "module",
-  "description": "Authoring tools for v1-11 poses: IK helpers, pose checker, screenshots of the real viewer.",
+  "description": "Authoring tools for poses (skeleton v2-21): IK helpers, pose checker, screenshots of the real viewer.",
   "exports": {
     ".": "./src/index.ts"
   },
@@ -11,6 +11,7 @@
     "test": "vitest run --passWithNoTests",
     "check": "tsx src/cli/check.ts",
     "separate": "tsx src/cli/separate.ts",
+    "legs": "tsx src/cli/legs.ts",
     "render": "tsx src/cli/render.ts"
   },
   "dependencies": {

@@ -12,7 +12,7 @@ Documents de référence :
 - **Site web d'abord (PWA)**, pas d'app mobile native au départ : la 3D web (Three.js) est mature, ça colle au stack React/Node, pas de stores, l'éditeur de poses est plus confortable sur ordinateur.
 - **Différenciation** face au marché (Grapplearts, BJJ Fanatics, GrappleKit, BJJ OS, Your BJJ, Tatami…, presque tous en anglais) : le français, la 3D orientable, la carte des positions (graphe).
 - **Animations** : pas de vidéo générée par IA (rendu faux sur le grappling). Chaque technique = une suite de poses (articulations des 2 combattants), interpolées. Le contenu est créé via un **éditeur de poses admin**.
-- **Rendu 3D** (ADR 0004) : on garde Three.js / R3F. Étape 1 faite : le mannequin Blender des vidéos, exporté en glTF (`fighter.v1.glb`), piloté par les articulations (`features/viewer/rig.ts`, testé contre Blender). Étape suivante possible : squelette `v2-21` via `upgradePose`. Changer de moteur ne réécrirait que le viewer et les enfants 3D de l'éditeur.
+- **Rendu 3D** (ADR 0004) : on garde Three.js / R3F. Étape 1 faite : le mannequin Blender des vidéos, exporté en glTF (`fighter.v1.glb`), piloté par les articulations (`features/viewer/rig.ts`, testé contre Blender). Étape 2 faite : squelette `v2-21` (épaules, hanches, buste, mains, pieds, nez en données), contenu converti par `upgradePose`. Changer de moteur ne réécrirait que le viewer et les enfants 3D de l'éditeur.
 - **Monétisation** (seulement après validation en club) : 1) abonnement clubs/profs (B2B, piste principale), 2) freemium pratiquants, 3) affiliation contextuelle (instructionals, kimonos), 4) sponsoring d'une catégorie. **Pas de pubs classiques / pop-ups** (peu rentable sur une niche, nuit à la 3D, au RGPD et au SEO). Éventuellement une seule bannière latérale desktop, à tester plus tard.
 - Encaissement via la micro-entreprise de Fares (Stripe).
 
@@ -50,26 +50,26 @@ Une technique est une **arête entre deux positions** (départ → arrivée, arr
 - Enums : catégorie = soumission, passage, renversement, sortie, projection ; niveau = débutant, intermédiaire, avancé ; gi/no-gi = gi, nogi, both
 - Valeurs d'enum en anglais dans le code, la base et l'API (submission, pass, sweep, escape, takedown ; beginner, intermediate, advanced ; gi, nogi, both ; top, bottom, neutral ; followup, counter, alternative), libellés français dans `@tatamap/shared`. Le rôle d'une position est exprimé du point de vue de `me`.
 
-### Format d'une pose (squelette `v1-11`)
+### Format d'une pose (squelette `v2-21`, ADR 0004)
 
-11 articulations par combattant, en (x, y, z), en cm, tatami à y = 0. Ordre : head, neck, hip, elbowL, handL, elbowR, handR, kneeL, footL, kneeR, footR. Combattants : `me` (le pratiquant qui exécute la technique, couleur #1D9E75 ; dessous au départ pour le ciseau) et `opponent` (#D85A30). `camera` optionnelle (angle conseillé par étape). `hands` optionnel : ce que fait chaque main (`grip` tient, `push` pousse / posée, `free` libre ; absente = auto), cf. ADR 0002 addendum. Repère main droite, y vers le haut, 1 unité Three.js = 1 cm ; L/R = gauche/droite propres au combattant (vérifié par `mirroredFighters` dans l'éditeur et `pose:check` ; les données du prototype ci-dessous ont `me` en miroir aux étapes 1 à 4). Longueurs d'os = corps standard symétrique (`STANDARD_BODY_V1_11` dans `@tatamap/shared`, ~1,75 m), le même pour les deux combattants, vérifié par l'éditeur et `pose:check`.
+21 points par combattant, en (x, y, z), en cm, tatami à y = 0. Ordre : head, nose, neck, chest, pelvis, shoulderL, shoulderR, elbowL, elbowR, handL, handR, handTipL, handTipR, hipL, hipR, kneeL, kneeR, footL, footR, toeL, toeR. `pelvis` = centre du bassin, `hipL/R` = articulations de hanche, `handL/R` = milieu de la main, `handTip` = bout des doigts, `footL/R` = cheville, `toe` = pointe du pied, `nose` = orientation de la tête. Combattants : `me` (le pratiquant qui exécute la technique, couleur #1D9E75 ; dessous au départ pour le ciseau) et `opponent` (#D85A30). `camera` optionnelle (angle conseillé par étape). `hands` optionnel : ce que fait chaque main (`grip` tient, `push` pousse / posée, `free` libre ; absente = auto), cf. ADR 0002 addendum. Repère main droite, y vers le haut, 1 unité Three.js = 1 cm ; L/R = gauche/droite propres au combattant (vérifié par `mirroredFighters` dans l'éditeur et `pose:check`). Longueurs d'os = corps standard symétrique (`STANDARD_BODY_V2_21` dans `@tatamap/shared`, ~1,75 m ; haut du bras 27-34 cm), le même pour les deux combattants, vérifié par l'éditeur et `pose:check`. Les anciennes poses `v1-11` (11 articulations, `hip` au lieu de `pelvis`, sans épaules ni hanches ni extrémités) restent lisibles : `upgradePose` les convertit à la lecture, `pnpm content:upgrade` réécrit les fichiers, `pnpm db:migrate-poses` la base. Côté Python (Blender, `transitions.py`) : `tools/blender/tatamap_pose.py`, même format et même conversion.
 
 ```json
 {
-  "skeleton": "v1-11",
+  "skeleton": "v2-21",
   "fighters": {
-    "me": { "head": [x,y,z], "neck": [...], "hip": [...], "elbowL": [...], "handL": [...], "elbowR": [...], "handR": [...], "kneeL": [...], "footL": [...], "kneeR": [...], "footR": [...] },
-    "opponent": { "...": "mêmes 11 articulations" }
+    "me": { "head": [x,y,z], "nose": [...], "neck": [...], "chest": [...], "pelvis": [...], "shoulderL": [...], "...": "21 points" },
+    "opponent": { "...": "mêmes 21 points" }
   },
   "camera": { "position": [170, 170, 300], "target": [0, 40, 20] }
 }
 ```
 
-Rendu du prototype : sphères aux articulations, cylindres entre (cou-hanche, cou-coude-main ×2, hanche-genou-pied ×2), tête r=13, interpolation smoothstep entre étapes (maintien ~1,2 s, transition ~1,3 s).
+Rendu du prototype (v1-11) : sphères aux articulations, cylindres entre (cou-hanche, cou-coude-main ×2, hanche-genou-pied ×2), tête r=13, interpolation smoothstep entre étapes (maintien ~1,2 s, transition ~1,3 s).
 
 ### Données du prototype : ciseau depuis la garde fermée
 
-Prototype 3D validé (poses placées à l'œil, à affiner dans l'éditeur). Coordonnées 2D issues d'un SVG (y vers le bas, sol à y=306) converties en 3D par `x3 = x - 300`, `y3 = 306 - y`, `z = 0` pour tête/cou/hanche, `+16` pour les membres *L, `-16` pour les membres *R. Étape 4 : `me` décalé de +18 en z ; `opponent` = pose 3 tournée de 55° autour de l'axe X (chute latérale), y min 6.
+Prototype 3D validé (poses placées à l'œil, en v1-11, converties par `upgradePose` dans le seed). Coordonnées 2D issues d'un SVG (y vers le bas, sol à y=306) converties en 3D par `x3 = x - 300`, `y3 = 306 - y`, `z = 0` pour tête/cou/hanche, `+16` pour les membres *L, `-16` pour les membres *R. Étape 4 : `me` décalé de +18 en z ; `opponent` = pose 3 tournée de 55° autour de l'axe X (chute latérale), y min 6.
 
 Étapes :
 1. Garde fermée : contrôle du col et de la manche

@@ -2,11 +2,11 @@ import { OrbitControls, OrthographicCamera, PerspectiveCamera } from '@react-thr
 import { useFrame, useThree } from '@react-three/fiber';
 import {
   type CameraHint,
+  type CurrentJoint,
   type CurrentPose,
   DEFAULT_HOLD_MS,
   type FighterId,
   interpolatePose,
-  type JointV1_11,
 } from '@tatamap/shared';
 import {
   type ElementRef,
@@ -27,7 +27,7 @@ import { buildTimeline, isStepEcho, sampleTimeline, timeAtStep } from './timelin
 export type { ViewPreset } from './camera';
 
 export type ViewerStep = { pose: CurrentPose; transitionMs: number };
-export type JointRef = { fighter: FighterId; joint: JointV1_11 };
+export type JointRef = { fighter: FighterId; joint: CurrentJoint };
 
 export type TechniqueSceneProps = {
   steps: ReadonlyArray<ViewerStep>;
@@ -153,13 +153,13 @@ export function TechniqueScene({
   // Editor picking: tag the joint with its fighter.
   const pickMe = useMemo(
     () =>
-      onJointPointerDown && ((joint: JointV1_11) => onJointPointerDown({ fighter: 'me', joint })),
+      onJointPointerDown && ((joint: CurrentJoint) => onJointPointerDown({ fighter: 'me', joint })),
     [onJointPointerDown],
   );
   const pickOpponent = useMemo(
     () =>
       onJointPointerDown &&
-      ((joint: JointV1_11) => onJointPointerDown({ fighter: 'opponent', joint })),
+      ((joint: CurrentJoint) => onJointPointerDown({ fighter: 'opponent', joint })),
     [onJointPointerDown],
   );
 

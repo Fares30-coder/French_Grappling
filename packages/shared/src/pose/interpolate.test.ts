@@ -1,22 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BONE_CHAIN_V1_11,
   interpolateFighter,
   interpolatePose,
   lerpVec3,
   slerpUnit,
   smoothstep,
 } from './interpolate';
-import type { CurrentPose } from './pose';
-import { JOINTS_V1_11, type Vec3 } from './skeleton-v1-11';
+import { CURRENT_BONE_CHAIN, CURRENT_JOINTS, CURRENT_SKELETON, type CurrentPose } from './pose';
+import type { Vec3 } from './skeleton-v1-11';
 
 const makePose = (offset: number): CurrentPose => {
   const fighter = (base: number) =>
     Object.fromEntries(
-      JOINTS_V1_11.map((j, i) => [j, [base + i + offset, 10 + i + offset, -5 + offset] as Vec3]),
+      CURRENT_JOINTS.map((j, i) => [j, [base + i + offset, 10 + i + offset, -5 + offset] as Vec3]),
     ) as CurrentPose['fighters']['me'];
   return {
-    skeleton: 'v1-11',
+    skeleton: CURRENT_SKELETON,
     fighters: { me: fighter(0), opponent: fighter(100) },
     camera: { position: [1, 2, 3], target: [0, 0, 0] },
   };
@@ -83,18 +82,22 @@ describe('slerpUnit', () => {
 });
 
 describe('interpolateFighter', () => {
-  // Arm raised forward (z) at a, sideways (x) at b: a 90° swing around the shoulder line.
+  // Arm raised forward (z) at a, sideways (x) at b: a 90° swing around the shoulder.
   const a = makePose(0).fighters.me;
   const b = { ...a };
-  a.elbowL = [a.neck[0], a.neck[1], a.neck[2] + 30];
-  a.handL = [a.neck[0], a.neck[1], a.neck[2] + 55];
-  b.elbowL = [a.neck[0] + 30, a.neck[1], a.neck[2]];
-  b.handL = [a.neck[0] + 55, a.neck[1], a.neck[2]];
+  const shoulder = a.shoulderL;
+  const at = (dx: number, dz: number): Vec3 => [shoulder[0] + dx, shoulder[1], shoulder[2] + dz];
+  a.elbowL = at(0, 30);
+  a.handL = at(0, 55);
+  a.handTipL = at(0, 63);
+  b.elbowL = at(30, 0);
+  b.handL = at(55, 0);
+  b.handTipL = at(63, 0);
 
   it('keeps every bone length mid-transition', () => {
     for (const s of [0.25, 0.5, 0.75]) {
       const mid = interpolateFighter(a, b, s);
-      for (const [parent, child] of BONE_CHAIN_V1_11) {
+      for (const [parent, child] of CURRENT_BONE_CHAIN) {
         expect(dist(mid[child], mid[parent])).toBeCloseTo(dist(a[child], a[parent]));
       }
     }
@@ -102,23 +105,23 @@ describe('interpolateFighter', () => {
 
   it('swings the hand on its arc instead of cutting the corner', () => {
     const mid = interpolateFighter(a, b, 0.5);
-    // A straight line would put the hand 38.9 cm from the neck; the arm is 55 cm long.
-    expect(dist(mid.handL, a.neck)).toBeCloseTo(55);
-    expect(mid.handL[0] - a.neck[0]).toBeCloseTo(55 * Math.SQRT1_2);
+    // A straight line would put the hand 38.9 cm from the shoulder; the arm is 55 cm long.
+    expect(dist(mid.handL, shoulder)).toBeCloseTo(55);
+    expect(mid.handL[0] - shoulder[0]).toBeCloseTo(55 * Math.SQRT1_2);
   });
 
-  it('moves the hip in a straight line and gives back the poses at the ends', () => {
-    const moved = { ...b, hip: [b.hip[0] + 20, b.hip[1], b.hip[2]] as Vec3 };
-    expect(interpolateFighter(a, moved, 0.5).hip[0]).toBeCloseTo(a.hip[0] + 10);
+  it('moves the pelvis in a straight line and gives back the poses at the ends', () => {
+    const moved = { ...b, pelvis: [b.pelvis[0] + 20, b.pelvis[1], b.pelvis[2]] as Vec3 };
+    expect(interpolateFighter(a, moved, 0.5).pelvis[0]).toBeCloseTo(a.pelvis[0] + 10);
     const end = interpolateFighter(a, b, 1);
-    for (const joint of JOINTS_V1_11) {
+    for (const joint of CURRENT_JOINTS) {
       expect(dist(end[joint], b[joint])).toBeCloseTo(0);
     }
   });
 
-  it('lists every joint but the hip once as a child', () => {
-    const children = BONE_CHAIN_V1_11.map(([, child]) => child).sort();
-    expect(children).toEqual(JOINTS_V1_11.filter((j) => j !== 'hip').sort());
+  it('lists every joint but the pelvis once as a child', () => {
+    const children = CURRENT_BONE_CHAIN.map(([, child]) => child).sort();
+    expect(children).toEqual(CURRENT_JOINTS.filter((j) => j !== 'pelvis').sort());
   });
 });
 
@@ -127,7 +130,7 @@ describe('interpolateFighter on the mat', () => {
     // Shin on the mat behind the knee, then in front of it: the shorter arc between the two
     // goes under the knee, 30 cm into the mat.
     const a = makePose(0).fighters.me;
-    const knee: Vec3 = [a.hip[0], 12, a.hip[2]];
+    const knee: Vec3 = [a.pelvis[0], 12, a.pelvis[2]];
     const before = { ...a, kneeL: knee, footL: [knee[0] - 40, 6, knee[2]] as Vec3 };
     const after = { ...a, kneeL: knee, footL: [knee[0] + 40, 6, knee[2]] as Vec3 };
     for (const s of [0.25, 0.5, 0.75]) {

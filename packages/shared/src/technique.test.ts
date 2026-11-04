@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validPose } from './pose/fixtures';
+import { validCurrentPose as validPose } from './pose/fixtures';
 import {
   hasConsistentEndPosition,
   isNumberedFrom1,

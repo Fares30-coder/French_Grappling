@@ -1,7 +1,9 @@
-"""Tatamap rig for Blender: two fighters whose bones are exactly the v1-11 skeleton.
+"""Tatamap rig for Blender: two fighters posed by the 11 base joints of the skeleton.
 
-Run inside Blender (Python console, Text Editor, or the Blender MCP server):
+Run inside Blender (Python console, Text Editor, or the Blender MCP server), with tools/blender
+on sys.path (for tatamap_pose, the pose format shared with the site):
 
+    import sys; sys.path.insert(0, '/path/to/tools/blender')
     exec(open('/path/to/tools/blender/tatamap_rig.py').read())
     build_scene()                                  # two rigged mannequins on a mat
     load_technique('/path/to/content/techniques/prise-du-dos-sous-crochet.json')
@@ -11,8 +13,12 @@ Run inside Blender (Python console, Text Editor, or the Blender MCP server):
 Conventions (CLAUDE.md, ADR 0002):
 - Tatamap: centimetres, y up, mat at y = 0. Blender: metres, z up. The mapping
   (x, y, z) -> (x, -z, y) / 100 is a rotation, so left stays left (handedness kept).
-- Joints: head, neck, hip, elbowL, handL, elbowR, handR, kneeL, footL, kneeR, footR.
-  `neck` doubles as the shoulder point, as in v1-11. Bone lengths = STANDARD_BODY_V1_11.
+- Joints: the rig is built on the 11 v1-11 joints (head, neck, hip, elbows, hands, knees,
+  feet; `neck` doubles as the shoulder point). Files are v2-21 (21 points): load_technique
+  drives the rig with the 11 base points (pelvis = hip), export_technique writes v2-21 back. A
+  step whose 11 points did not move keeps its pose as it was (shoulders, hip joints, tips
+  refined in the site editor stay); a moved step gets its other points derived again
+  (tatamap_pose.upgrade_fighter), to refine in the site editor if needed.
 - Posing uses controllers: `root` (hip), `neck_ctrl`, `head_ctrl`, `hand_ik.L/R`,
   `elbow_pole.L/R`, `foot_ik.L/R`, `knee_pole.L/R`. The deform bones follow (IK + tracking),
   so exported poses always have standard bone lengths.
@@ -24,6 +30,12 @@ import math
 
 import bpy
 from mathutils import Matrix, Vector
+
+try:
+    from tatamap_pose import SKELETON, to_v1_fighter, upgrade_fighter, upgrade_pose
+except ImportError as error:  # exec'd without tools/blender on sys.path
+    raise ImportError("put tools/blender on sys.path first: "
+                      "import sys; sys.path.insert(0, '/path/to/tools/blender')") from error
 
 JOINTS = ['head', 'neck', 'hip', 'elbowL', 'handL', 'elbowR', 'handR', 'kneeL', 'footL', 'kneeR', 'footR']
 FIGHTERS = {'me': (0x1D / 255, 0x9E / 255, 0x75 / 255), 'opponent': (0xD8 / 255, 0x5A / 255, 0x30 / 255)}
@@ -345,8 +357,9 @@ def load_technique(path):
     for i, step in enumerate(technique['steps'], start=1):
         if i > 1:
             frame += round(step['transitionMs'] / 1000 * FPS)
+        fighters = upgrade_pose(step['pose'])['fighters']
         for fid, rig in rigs.items():
-            apply_fighter_pose(rig, step['pose']['fighters'][fid])
+            apply_fighter_pose(rig, to_v1_fighter(fighters[fid]))
             _key_all(rig, frame)
         scene.timeline_markers.new(f'step {i}', frame=frame)
         frame += round(HOLD_MS / 1000 * FPS)
@@ -355,6 +368,10 @@ def load_technique(path):
     scene.frame_start, scene.frame_end = 1, frame
     scene.frame_set(1)
     return {'slug': technique['slug'], 'steps': len(technique['steps']), 'frames': frame}
+
+
+# A load then export with nothing moved changes no joint by more than 0.3 cm (README).
+ROUND_TRIP_CM = 0.5
 
 
 def export_technique(path):
@@ -369,8 +386,14 @@ def export_technique(path):
     rigs = {fid: bpy.data.objects[f'{fid}_rig'] for fid in FIGHTERS}
     for marker, step in zip(markers, technique['steps']):
         scene.frame_set(marker.frame)
+        step['pose'] = upgrade_pose(step['pose'])
         for fid, rig in rigs.items():
-            step['pose']['fighters'][fid] = read_fighter_pose(rig)
+            base = read_fighter_pose(rig)
+            before = to_v1_fighter(step['pose']['fighters'][fid])
+            if max(math.dist(base[j], before[j]) for j in JOINTS) > ROUND_TRIP_CM:
+                step['pose']['fighters'][fid] = {
+                    j: [round(c, 1) for c in p] for j, p in upgrade_fighter(base).items()}
+        step['pose']['skeleton'] = SKELETON
     with open(path, 'w', encoding='utf-8') as fh:
         json.dump(technique, fh, ensure_ascii=False, indent=2)
         fh.write('\n')

@@ -1,4 +1,6 @@
 import type { PoseV1_11 } from './skeleton-v1-11';
+import type { PoseV2_21 } from './skeleton-v2-21';
+import { upgradeV1toV2 } from './upgrade-v1-v2';
 
 // Scissor sweep, step 1 (see CLAUDE.md), already converted to 3D centimetres.
 /** Test fixture, not exported from the package index. */
@@ -34,5 +36,8 @@ export const validPose: PoseV1_11 = {
   },
   camera: { position: [170, 170, 300], target: [0, 40, 20] },
 };
+
+/** The same pose in the current skeleton (v2-21). Test fixture. */
+export const validCurrentPose: PoseV2_21 = upgradeV1toV2(validPose);
 
 export const deepClone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;

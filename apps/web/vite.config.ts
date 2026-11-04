@@ -58,7 +58,9 @@ export default defineConfig({
             urlPattern: isPublicApiRead,
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'tatamap-api',
+              // Renamed at each skeleton migration (ADR 0002 D6.8): an offline copy in the old
+              // pose format is never served to a newer app.
+              cacheName: 'tatamap-api-v2-21',
               networkTimeoutSeconds: 4,
               expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 60 },
               cacheableResponse: { statuses: [200] },

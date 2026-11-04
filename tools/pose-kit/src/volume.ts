@@ -1,39 +1,46 @@
 import {
+  type CurrentFighterPose,
+  type CurrentJoint,
   type CurrentPose,
   FIGHTERS,
   type FighterId,
-  type FighterPoseV1_11,
   HEAD_RADIUS_CM,
   interpolateFighter,
-  type JointV1_11,
   type Vec3,
 } from '@tatamap/shared';
 import { closestPoints } from './analyze';
 import { add, cross, distance, dot, length, scale, sub, unit } from './vec';
 
 /**
- * Body volume of a v1-11 fighter as capsules, sized like the Blender mannequin
- * (tools/blender/tatamap_humanoid.py: RADII and derived_points): shoulders at neck +/- 17 cm
- * sideways and 5 cm down, hip joints at hip +/- 9 cm and 5 cm down, wrist 7 cm before the hand
- * point. The torso is two side-by-side capsules, so it is wider than deep like the mannequin's.
+ * Body volume of a v2-21 fighter as capsules, sized like the Blender mannequin
+ * (tools/blender/tatamap_humanoid.py: RADII): shoulders, hip joints, chest, fingertips and toes
+ * are the pose's own points; the wrist is 7 cm before the hand point. The torso is two
+ * side-by-side capsules, so it is wider than deep like the mannequin's.
  */
 
-/** Orthonormal body frame: up = hip -> neck, forward = the thighs across the spine, left = up x forward. */
-export function bodyFrame(f: FighterPoseV1_11): { up: Vec3; fwd: Vec3; left: Vec3 } {
-  const up = unit(sub(f.neck, f.hip));
-  const thighs = sub(add(f.kneeL, f.kneeR), scale(f.hip, 2));
-  let fwd = sub(thighs, scale(up, dot(thighs, up)));
-  if (length(fwd) < 3) fwd = sub([1, 0, 0], scale(up, up[0]));
-  fwd = unit(fwd, [0, 0, 1]);
-  const left = unit(cross(up, fwd));
-  return { up, fwd: cross(left, up), left };
+/**
+ * Orthonormal body frame: up = pelvis -> neck, left = across the hip joints (the thighs give the
+ * facing if the hip joints sit on the spine), forward = left x up.
+ */
+export function bodyFrame(f: CurrentFighterPose): { up: Vec3; fwd: Vec3; left: Vec3 } {
+  const up = unit(sub(f.neck, f.pelvis));
+  const across = sub(f.hipL, f.hipR);
+  let left = sub(across, scale(up, dot(across, up)));
+  if (length(left) < 3) {
+    const thighs = sub(add(f.kneeL, f.kneeR), scale(f.pelvis, 2));
+    let fwd = sub(thighs, scale(up, dot(thighs, up)));
+    if (length(fwd) < 3) fwd = sub([1, 0, 0], scale(up, up[0]));
+    left = cross(up, unit(fwd, [0, 0, 1]));
+  }
+  left = unit(left, [0, 0, -1]);
+  return { up, fwd: unit(cross(left, up)), left };
 }
 
 /**
  * A capsule end: a weighted sum of joints plus a fixed offset. The weights tell `separateBodies`
  * which joints to move when that end must move.
  */
-export type CapsuleEnd = { point: Vec3; joints: ReadonlyArray<readonly [JointV1_11, number]> };
+export type CapsuleEnd = { point: Vec3; joints: ReadonlyArray<readonly [CurrentJoint, number]> };
 export type Capsule = {
   part: string;
   a: CapsuleEnd;
@@ -43,14 +50,14 @@ export type Capsule = {
   core?: readonly [Vec3, Vec3];
 };
 
-const at = (f: FighterPoseV1_11, joint: JointV1_11, offset: Vec3 = [0, 0, 0]): CapsuleEnd => ({
+const at = (f: CurrentFighterPose, joint: CurrentJoint, offset: Vec3 = [0, 0, 0]): CapsuleEnd => ({
   point: add(f[joint], offset),
   joints: [[joint, 1]],
 });
 const between = (
-  f: FighterPoseV1_11,
-  from: JointV1_11,
-  to: JointV1_11,
+  f: CurrentFighterPose,
+  from: CurrentJoint,
+  to: CurrentJoint,
   k: number,
   offset: Vec3 = [0, 0, 0],
 ): CapsuleEnd => ({
@@ -61,56 +68,34 @@ const between = (
   ],
 });
 
-/** Where the chest sits on the hip -> neck line (34 cm up a ~50 cm spine on the mannequin). */
-const CHEST_ON_SPINE = 0.68;
 const WRIST_CM = 7;
-const FINGERS_CM = 8;
-const TOES_CM = 15;
 
-export function bodyCapsules(f: FighterPoseV1_11): Capsule[] {
-  const { up, fwd, left } = bodyFrame(f);
+export function bodyCapsules(f: CurrentFighterPose): Capsule[] {
+  const { up, left } = bodyFrame(f);
   const side = (cm: number, upCm = 0) => add(scale(left, cm), scale(up, upCm));
   const capsules: Capsule[] = [];
-  const core = [f.hip, between(f, 'hip', 'neck', CHEST_ON_SPINE).point] as const;
+  const core = [f.pelvis, f.chest] as const;
   for (const sign of [1, -1]) {
     capsules.push({
       part: 'torso',
-      a: at(f, 'hip', side(4 * sign)),
-      b: between(f, 'hip', 'neck', CHEST_ON_SPINE, side(5.5 * sign)),
+      a: at(f, 'pelvis', side(4 * sign)),
+      b: at(f, 'chest', side(5.5 * sign)),
       radius: 12,
       core,
     });
   }
   capsules.push(
-    {
-      part: 'chest',
-      a: between(f, 'hip', 'neck', CHEST_ON_SPINE),
-      b: at(f, 'neck', side(0, -3)),
-      radius: 10,
-    },
-    {
-      part: 'shoulders',
-      a: at(f, 'neck', side(17, -5)),
-      b: at(f, 'neck', side(-17, -5)),
-      radius: 7,
-    },
+    { part: 'chest', a: at(f, 'chest'), b: at(f, 'neck', side(0, -3)), radius: 10 },
+    { part: 'shoulders', a: at(f, 'shoulderL'), b: at(f, 'shoulderR'), radius: 7 },
     { part: 'neck', a: at(f, 'neck'), b: between(f, 'neck', 'head', 0.4), radius: 6 },
     { part: 'head', a: at(f, 'head'), b: at(f, 'head'), radius: HEAD_RADIUS_CM },
   );
-  for (const [s, sign] of [
-    ['L', 1],
-    ['R', -1],
-  ] as const) {
+  for (const s of ['L', 'R'] as const) {
     const elbow = `elbow${s}` as const;
     const hand = `hand${s}` as const;
-    const knee = `knee${s}` as const;
-    const foot = `foot${s}` as const;
     const forearm = Math.max(distance(f[elbow], f[hand]), WRIST_CM + 1);
-    const shin = unit(sub(f[foot], f[knee]));
-    const footDir = unit(sub(fwd, scale(shin, dot(fwd, shin))), fwd);
-    const fingers = scale(unit(sub(f[hand], f[elbow])), FINGERS_CM);
     capsules.push(
-      { part: `upperArm${s}`, a: at(f, 'neck', side(17 * sign, -5)), b: at(f, elbow), radius: 5.2 },
+      { part: `upperArm${s}`, a: at(f, `shoulder${s}`), b: at(f, elbow), radius: 5.2 },
       {
         part: `forearm${s}`,
         a: at(f, elbow),
@@ -120,12 +105,12 @@ export function bodyCapsules(f: FighterPoseV1_11): Capsule[] {
       {
         part: `hand${s}`,
         a: between(f, elbow, hand, 1 - WRIST_CM / forearm),
-        b: at(f, hand, fingers),
+        b: at(f, `handTip${s}`),
         radius: 3.5,
       },
-      { part: `thigh${s}`, a: at(f, 'hip', side(9 * sign, -5)), b: at(f, knee), radius: 7.5 },
-      { part: `shin${s}`, a: at(f, knee), b: at(f, foot), radius: 5 },
-      { part: `foot${s}`, a: at(f, foot), b: at(f, foot, scale(footDir, TOES_CM)), radius: 3.5 },
+      { part: `thigh${s}`, a: at(f, `hip${s}`), b: at(f, `knee${s}`), radius: 7.5 },
+      { part: `shin${s}`, a: at(f, `knee${s}`), b: at(f, `foot${s}`), radius: 5 },
+      { part: `foot${s}`, a: at(f, `foot${s}`), b: at(f, `toe${s}`), radius: 3.5 },
     );
   }
   return capsules;

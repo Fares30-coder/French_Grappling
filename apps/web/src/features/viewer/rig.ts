@@ -1,16 +1,16 @@
-import type { FighterPoseV1_11, HandState, Vec3 } from '@tatamap/shared';
+import type { CurrentFighterPose, CurrentJoint, HandState, Vec3 } from '@tatamap/shared';
 import { Quaternion, Vector3 } from 'three';
 
 /**
- * Bone frames of the humanoid model from a v1-11 fighter (ADR 0004, step 1). A port of
- * `derived_points` and `bone_frames` in tools/blender/tatamap_humanoid.py, which renders the
- * videos with the same model: same derived points, same rolls, same hands. Kept in step with
- * it by rig.test.ts, against frames computed by Blender (tools/blender/rig_fixture.py).
+ * Bone frames of the humanoid model from a v2-21 fighter (ADR 0004). A port of `derived_points`
+ * and `bone_frames` in tools/blender/tatamap_humanoid.py, which renders the videos with the same
+ * model: same points, same rolls, same hands. Kept in step with it by rig.test.ts, against frames
+ * computed by Blender (tools/blender/rig_fixture.py).
  *
- * v1-11 has no shoulders, hip joints, hands, feet or torso orientation; they are derived:
- * up = hip -> neck, forward = the thighs across the spine, left = up x forward; shoulders at
- * neck +/- 17 cm (moved like a shoulder blade), hip joints at hip +/- 9 cm, limbs twisted towards
- * the elbow and knee points. Pure; three's maths only.
+ * Shoulders, hip joints, chest, fingertips, toes and nose are data in v2-21 (`upgradePose` put
+ * them where step 1 of ADR 0004 used to derive them from v1-11). Still derived: up = pelvis ->
+ * neck, left = across the hip joints, forward = left x up; the waist, the collarbone and the
+ * wrist; limbs twisted towards the elbow and knee points. Pure; three's maths only.
  */
 
 /** A bone at a moment: head and tail points and its z axis (roll), Tatamap cm. */
@@ -54,15 +54,25 @@ function turnTowards(a: Vector3, b: Vector3, maxDeg: number): Vector3 {
   return a.clone().applyAxisAngle(axis.normalize(), maxDeg * DEG);
 }
 
-/** Orthonormal body frame of a fighter; `prevForward` limits how far the facing turns. */
-function bodyFrame(f: FighterPoseV1_11, prevForward: Vector3 | null, maxDeg: number) {
-  const hip = v(f.hip);
+/**
+ * Orthonormal body frame of a fighter; `prevForward` limits how far the facing turns. Forward is
+ * square to the line across the hip joints; if they sit on the spine, the thighs give it.
+ */
+function bodyFrame(f: CurrentFighterPose, prevForward: Vector3 | null, maxDeg: number) {
+  const hip = v(f.pelvis);
   const up = unit(v(f.neck).sub(hip));
-  const thighs = v(f.kneeL).add(v(f.kneeR)).sub(hip.clone().multiplyScalar(2));
-  let fwd = thighs.clone().sub(up.clone().multiplyScalar(thighs.dot(up)));
-  if (fwd.length() < 3) {
-    fwd = prevForward ? prevForward.clone() : new Vector3(1, 0, 0);
-    fwd.sub(up.clone().multiplyScalar(fwd.dot(up)));
+  const across = v(f.hipL).sub(v(f.hipR));
+  across.sub(up.clone().multiplyScalar(across.dot(up)));
+  let fwd: Vector3;
+  if (across.length() > 3) {
+    fwd = across.clone().cross(up);
+  } else {
+    const thighs = v(f.kneeL).add(v(f.kneeR)).sub(hip.clone().multiplyScalar(2));
+    fwd = thighs.clone().sub(up.clone().multiplyScalar(thighs.dot(up)));
+    if (fwd.length() < 3) {
+      fwd = prevForward ? prevForward.clone() : new Vector3(1, 0, 0);
+      fwd.sub(up.clone().multiplyScalar(fwd.dot(up)));
+    }
   }
   fwd.normalize();
   if (prevForward) {
@@ -83,29 +93,7 @@ function bendDir(root: Vector3, mid: Vector3, end: Vector3, straight: Vector3, f
   return d.length() > 1e-6 ? d.normalize() : straight.clone();
 }
 
-// Shoulder -> elbow kept in this range: v1-11 measures the arm from the neck (35 cm), so a raised
-// arm left 18-22 cm from the shoulder (21 was allowed) and the shoulder looked crushed.
-const UPPER_ARM_CM = [27, 34] as const;
-const SHOULDER_SHIFT_CM = 10;
 const DELTOID_CM = 8;
-
-/** Shoulder point, moved like a shoulder blade so the upper arm is never crushed or overlong. */
-function shoulder(nominal: Vector3, elbow: Vector3, fwd: Vector3, up: Vector3): Vector3 {
-  const near = Math.min(1, elbow.distanceTo(nominal) / 8);
-  const reach = unit(elbow.clone().sub(nominal)).multiplyScalar(near);
-  const s = nominal.clone().add(
-    fwd
-      .clone()
-      .multiplyScalar(Math.max(0, reach.dot(fwd)))
-      .add(up.clone().multiplyScalar(Math.max(0, reach.dot(up))))
-      .multiplyScalar(3),
-  );
-  const d = elbow.distanceTo(s);
-  const [lo, hi] = UPPER_ARM_CM;
-  let shift = Math.min(d - lo, 0) + Math.max(d - hi, 0);
-  shift = Math.max(-SHOULDER_SHIFT_CM, Math.min(SHOULDER_SHIFT_CM, shift)) * Math.min(1, d / 8);
-  return s.clone().add(unit(elbow.clone().sub(s)).multiplyScalar(shift));
-}
 
 /**
  * No-twist references, in the torso frame (left, up, forward): [limb direction, roll there].
@@ -139,58 +127,47 @@ type Refs = Record<string, Vector3>;
 
 /** Humanoid points (cm) and roll references of a fighter. */
 export function derivedPoints(
-  f: FighterPoseV1_11,
+  f: CurrentFighterPose,
   prevForward: Vector3 | null = null,
   maxTurnDeg = Infinity,
 ): { q: Points; refs: Refs } {
   const { up, fwd, left } = bodyFrame(f, prevForward, maxTurnDeg);
-  const hip = v(f.hip);
+  const hip = v(f.pelvis);
   const neck = v(f.neck);
   const head = v(f.head);
   const q: Points = {
     hip,
     waist: hip.clone().add(up.clone().multiplyScalar(16)),
-    chest: hip.clone().add(up.clone().multiplyScalar(34)),
+    chest: v(f.chest),
     neck,
     neck_top: neck.clone().add(head.clone().sub(neck).multiplyScalar(0.4)),
     head,
     head_top: head.clone().add(unit(head.clone().sub(neck)).multiplyScalar(11)),
     clav: neck.clone().sub(up.clone().multiplyScalar(3)),
   };
-  const refs: Refs = { up, fwd, left };
-  for (const [s, sign] of [
-    ['L', 1],
-    ['R', -1],
-  ] as const) {
+  // The head faces its nose (square to the head's axis).
+  const headAxis = unit(head.clone().sub(neck));
+  const face = v(f.nose).sub(head);
+  face.sub(headAxis.clone().multiplyScalar(face.dot(headAxis)));
+  const refs: Refs = { up, fwd, left, face: face.length() > 1e-3 ? face.normalize() : fwd.clone() };
+  for (const s of ['L', 'R'] as const) {
     const elbow = v(f[`elbow${s}`]);
     const hand = v(f[`hand${s}`]);
     const knee = v(f[`knee${s}`]);
     const foot = v(f[`foot${s}`]);
-    const nominal = neck
-      .clone()
-      .add(left.clone().multiplyScalar(17 * sign))
-      .sub(up.clone().multiplyScalar(5));
-    const shoulderPt = shoulder(nominal, elbow, fwd, up);
+    const shoulderPt = v(f[`shoulder${s}`]);
     q[`shoulder${s}`] = shoulderPt;
     q[`elbow${s}`] = elbow;
     const fore = unit(hand.clone().sub(elbow));
     const wrist = hand.clone().sub(fore.clone().multiplyScalar(7));
     q[`wrist${s}`] = wrist;
-    q[`finger${s}`] = hand.clone().add(fore.clone().multiplyScalar(8));
-    const hipj = hip
-      .clone()
-      .add(left.clone().multiplyScalar(9 * sign))
-      .sub(up.clone().multiplyScalar(5));
+    q[`finger${s}`] = v(f[`handTip${s}`]);
+    const hipj = v(f[`hip${s}`]);
     q[`hipj${s}`] = hipj;
     q[`knee${s}`] = knee;
     q[`ankle${s}`] = foot;
-    // The foot points like the kneecap (the torso's forward when the leg is straight): taken from
-    // the torso, it spun round the shin whenever the derived facing turned.
     const kneeDir = bendDir(hipj, knee, foot, fwd);
-    const shin = unit(foot.clone().sub(knee));
-    let footDir = kneeDir.clone().sub(shin.clone().multiplyScalar(kneeDir.dot(shin)));
-    footDir = footDir.length() > 1e-3 ? footDir.normalize() : fwd.clone();
-    q[`toe${s}`] = foot.clone().add(footDir.multiplyScalar(15));
+    q[`toe${s}`] = v(f[`toe${s}`]);
     const elbowDir = bendDir(shoulderPt, elbow, wrist, fwd.clone().multiplyScalar(-1));
     refs[`elbow${s}`] = elbowDir;
     refs[`thumb${s}`] = elbowDir.clone().multiplyScalar(-1);
@@ -208,7 +185,7 @@ export const HUMANOID_BONES: ReadonlyArray<readonly [string, string, string, str
   ['abdomen', 'waist', 'chest', 'fwd'],
   ['chest', 'chest', 'neck', 'fwd'],
   ['neck', 'neck', 'neck_top', 'fwd'],
-  ['head', 'neck_top', 'head_top', 'fwd'],
+  ['head', 'neck_top', 'head_top', 'face'],
   ...(['L', 'R'] as const).flatMap(
     (s) =>
       [
@@ -338,10 +315,8 @@ function handBones(hand: BoneFrame, s: 'L' | 'R', sign: number, shape: number): 
 /** A hand point this close to the opponent's surface (cm) is closed, beyond `hi` relaxed. */
 const GRIP_CM = [3, 10] as const;
 /** The opponent's volume, as capsules: [joint, joint, radius cm]. */
-const GRIP_CAPSULES: ReadonlyArray<
-  readonly [keyof FighterPoseV1_11, keyof FighterPoseV1_11, number]
-> = [
-  ['hip', 'neck', 14],
+const GRIP_CAPSULES: ReadonlyArray<readonly [CurrentJoint, CurrentJoint, number]> = [
+  ['pelvis', 'neck', 14],
   ['neck', 'head', 6],
   ['head', 'head', 12],
   ...(['L', 'R'] as const).flatMap(
@@ -349,7 +324,7 @@ const GRIP_CAPSULES: ReadonlyArray<
       [
         ['neck', `elbow${s}`, 5],
         [`elbow${s}`, `hand${s}`, 4],
-        ['hip', `knee${s}`, 8],
+        ['pelvis', `knee${s}`, 8],
         [`knee${s}`, `foot${s}`, 5.5],
       ] as const,
   ),
@@ -366,7 +341,11 @@ function pointSegmentDistance(p: Vector3, a: Vector3, b: Vector3): number {
 const smoothstep = (t: number) => t * t * (3 - 2 * t);
 
 /** How closed hand `s` is (0 relaxed, 1 fist): on the opponent's body, or on the other hand. */
-export function gripAmount(f: FighterPoseV1_11, s: 'L' | 'R', other?: FighterPoseV1_11): number {
+export function gripAmount(
+  f: CurrentFighterPose,
+  s: 'L' | 'R',
+  other?: CurrentFighterPose,
+): number {
   const hand = v(f[`hand${s}`]);
   let gap = hand.distanceTo(v(f[s === 'L' ? 'handR' : 'handL'])) - 6;
   if (other) {
@@ -380,7 +359,7 @@ export function gripAmount(f: FighterPoseV1_11, s: 'L' | 'R', other?: FighterPos
 
 export type BoneFramesInput = {
   /** The other fighter's joints, for automatic grips. */
-  other?: FighterPoseV1_11 | undefined;
+  other?: CurrentFighterPose | undefined;
   /** This fighter's entry of the pose's `hands`; a hand left out is automatic. */
   hands?: Partial<Record<'L' | 'R', HandState>> | undefined;
   /** The previous frame's state, and the time since (s): facing, rolls and hands turn smoothly. */
@@ -390,7 +369,7 @@ export type BoneFramesInput = {
 
 /** Each bone's frame for a fighter, and the state to pass as `prev` to the next frame. */
 export function boneFrames(
-  f: FighterPoseV1_11,
+  f: CurrentFighterPose,
   { other, hands, prev = null, dtSeconds = 1 / 30 }: BoneFramesInput = {},
 ): { bones: BoneFrames; state: RigState } {
   const maxTurnDeg = MAX_TURN_DEG_PER_S * dtSeconds;

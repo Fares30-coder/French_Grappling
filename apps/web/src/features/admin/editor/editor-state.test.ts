@@ -3,6 +3,7 @@ import {
   adminTechniqueSchema,
   type CurrentPose,
   mirrorPose,
+  moveJoint,
   POSE_BOUNDS_CM,
   STARTER_POSE,
   techniqueUpdateInputSchema,
@@ -28,7 +29,7 @@ const movedPose = (dx: number): CurrentPose => ({
   ...STARTER_POSE,
   fighters: {
     ...STARTER_POSE.fighters,
-    me: { ...STARTER_POSE.fighters.me, handL: [-15 + dx, 128, -15] },
+    me: moveJoint(STARTER_POSE.fighters.me, 'handL', [-15 + dx, 128, -15]),
   },
 });
 

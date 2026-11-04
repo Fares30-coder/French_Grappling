@@ -116,7 +116,7 @@ describe('GET /api/techniques', () => {
     expect(sweep?.stepCount).toBe(3);
     expect(sweep?.endPosition?.slug).toBe('montee');
     expect(sweep?.tags.map((t) => t.name)).toEqual([`Été ${token}`]);
-    expect(sweep?.preview.skeleton).toBe('v1-11');
+    expect(sweep?.preview.skeleton).toBe('v2-21');
     expect(body?.techniques[0]?.endPosition).toBeNull();
     expect(JSON.stringify(body)).not.toMatch(/"id"/);
   });

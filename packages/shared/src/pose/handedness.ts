@@ -1,5 +1,5 @@
-import type { CurrentPose } from './pose';
-import { FIGHTERS, type FighterId, type FighterPoseV1_11, type Vec3 } from './skeleton-v1-11';
+import type { CurrentFighterPose, CurrentPose } from './pose';
+import { FIGHTERS, type FighterId, type Vec3 } from './skeleton-v1-11';
 
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
@@ -20,14 +20,15 @@ const MIN_FORWARD_CM = 3;
  * hand, knee and foot). Positive = labels match the body, negative = the fighter is a mirror
  * image (L joints on the right side). `null` when the facing cannot be told.
  *
- * Without shoulders the skeleton has no left/right axis of its own, so "forward" is taken from
- * the thighs (knees are in front of the torso in nearly every grappling pose), and left =
- * up x forward with up = hip -> neck. APPROXIMATE: crossed or tangled legs give small scores.
+ * The labels of the shoulders and hip joints could be swapped along with the limbs, so they do
+ * not tell the body's own left: "forward" is taken from the thighs (knees are in front of the
+ * torso in nearly every grappling pose), and left = up x forward with up = pelvis -> neck.
+ * APPROXIMATE: crossed or tangled legs give small scores.
  */
-export function handednessScore(fighter: FighterPoseV1_11): number | null {
-  const spine = sub(fighter.neck, fighter.hip);
+export function handednessScore(fighter: CurrentFighterPose): number | null {
+  const spine = sub(fighter.neck, fighter.pelvis);
   const up = scale(spine, 1 / norm(spine));
-  const thighs = sub(add(fighter.kneeL, fighter.kneeR), scale(fighter.hip, 2));
+  const thighs = sub(add(fighter.kneeL, fighter.kneeR), scale(fighter.pelvis, 2));
   const forward = sub(thighs, scale(up, dot(thighs, up)));
   const forwardLength = norm(forward);
   if (forwardLength < MIN_FORWARD_CM) return null;

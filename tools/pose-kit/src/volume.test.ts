@@ -1,4 +1,4 @@
-import { boneLengths, type FighterPoseV1_11, handednessScore, type Vec3 } from '@tatamap/shared';
+import { boneLengths, type CurrentFighterPose, handednessScore, type Vec3 } from '@tatamap/shared';
 import { describe, expect, it } from 'vitest';
 import { bentNecks } from './analyze';
 import {
@@ -14,7 +14,7 @@ import { bodyFrame, bodyPenetrations, maxPenetration, transitionPenetration } fr
 
 // Standing, facing +x (left is -z), arms forward and down, feet apart.
 const spec: FighterSpec = {
-  hip: [0, 95, 0],
+  pelvis: [0, 95, 0],
   torsoDir: [0, 1, 0],
   headDir: [0, 1, 0],
   hands: {
@@ -28,10 +28,10 @@ const spec: FighterSpec = {
 };
 const me = buildFighter(STANDARD_LENGTHS, spec);
 /** The same body turned half a turn to face me, `gap` cm in front (hip to hip). */
-const facing = (gap: number): FighterPoseV1_11 =>
+const facing = (gap: number): CurrentFighterPose =>
   Object.fromEntries(
     Object.entries(me).map(([j, [x, y, z]]) => [j, [gap - x, y, -z]]),
-  ) as FighterPoseV1_11;
+  ) as CurrentFighterPose;
 
 describe('bodyFrame', () => {
   it('faces where the knees point, left = up x forward', () => {
@@ -57,7 +57,12 @@ describe('bodyPenetrations', () => {
   });
 
   it('flags a forearm through its own head', () => {
-    const folded = { ...me, elbowR: [5, 175, 10], handR: [0, 150, 0] } as FighterPoseV1_11;
+    const folded = {
+      ...me,
+      elbowR: [5, 175, 10],
+      handR: [0, 150, 0],
+      handTipR: [-2, 143, -2],
+    } as CurrentFighterPose;
     const self = bodyPenetrations(makePose(folded, translateFighter(me, [0, 0, 300])));
     expect(self.map((p) => p.between)).toContain('me head x me forearmR');
   });
@@ -83,7 +88,7 @@ describe('separateBodies', () => {
     const clean = makePose(me, translateFighter(me, [0, 0, 300]));
     expect(separateBodies(clean).fighters).toEqual(clean.fighters);
     const out = separateBodies(makePose(me, facing(5)), { maxMoveCm: 4 });
-    expect(distance(out.fighters.me.hip, me.hip)).toBeLessThan(4.1); // + rounding to 0.1 cm
+    expect(distance(out.fighters.me.pelvis, me.pelvis)).toBeLessThan(4.1); // + rounding to 0.1 cm
   });
 
   it('also separates inside a transition', () => {
@@ -92,8 +97,9 @@ describe('separateBodies', () => {
     // Shifted by hand: translateFighter clamps into the schema bounds.
     const over = (x: number) =>
       Object.fromEntries(
-        Object.entries(me).map(([j, [px, py, pz]]) => [j, [px + x, py + 150, pz]]),
-      ) as FighterPoseV1_11;
+        // z + 15: his left foot passes right over my head (the legs hang from the hip joints).
+        Object.entries(me).map(([j, [px, py, pz]]) => [j, [px + x, py + 150, pz + 15]]),
+      ) as CurrentFighterPose;
     const [a, b] = [makePose(me, over(-60)), makePose(me, over(60))];
     expect(maxPenetration(a) + maxPenetration(b)).toBe(0);
     expect(transitionPenetration(a, b)?.between).toMatch(/me head x opponent (foot|shin)/);
