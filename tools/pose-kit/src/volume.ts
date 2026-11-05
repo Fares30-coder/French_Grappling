@@ -69,6 +69,7 @@ const between = (
 });
 
 const WRIST_CM = 7;
+const UPPER_ARM_RADIUS_CM = 5.2;
 
 export function bodyCapsules(f: CurrentFighterPose): Capsule[] {
   const { up, left } = bodyFrame(f);
@@ -95,7 +96,12 @@ export function bodyCapsules(f: CurrentFighterPose): Capsule[] {
     const hand = `hand${s}` as const;
     const forearm = Math.max(distance(f[elbow], f[hand]), WRIST_CM + 1);
     capsules.push(
-      { part: `upperArm${s}`, a: at(f, `shoulder${s}`), b: at(f, elbow), radius: 5.2 },
+      {
+        part: `upperArm${s}`,
+        a: at(f, `shoulder${s}`),
+        b: at(f, elbow),
+        radius: UPPER_ARM_RADIUS_CM,
+      },
       {
         part: `forearm${s}`,
         a: at(f, elbow),
@@ -114,6 +120,32 @@ export function bodyCapsules(f: CurrentFighterPose): Capsule[] {
     );
   }
   return capsules;
+}
+
+/** The part of the upper arm that starts outside the trunk: the rest leaves from the shoulder. */
+const UPPER_ARM_FREE_FROM = 0.35;
+/** Radius of the trunk's core: an arm hanging at the side stays clear of it, one through the chest does not. */
+const TRUNK_CORE_RADIUS_CM = 9;
+
+/**
+ * The upper arm against the fighter's own trunk, which `bodyCapsules` cannot tell apart from a
+ * shoulder at rest: the far part of each upper arm, and the spine as a thinner capsule.
+ */
+function upperArmThroughTrunk(f: CurrentFighterPose): Array<[Capsule, Capsule]> {
+  const core = [f.pelvis, f.chest] as const;
+  const trunk: Capsule[] = [
+    { part: 'trunk', a: at(f, 'pelvis'), b: at(f, 'chest'), radius: TRUNK_CORE_RADIUS_CM, core },
+    { part: 'trunk', a: at(f, 'chest'), b: at(f, 'neck'), radius: TRUNK_CORE_RADIUS_CM, core },
+  ];
+  return (['L', 'R'] as const).flatMap((s) => {
+    const arm: Capsule = {
+      part: `upperArm${s}`,
+      a: between(f, `shoulder${s}`, `elbow${s}`, UPPER_ARM_FREE_FROM),
+      b: at(f, `elbow${s}`),
+      radius: UPPER_ARM_RADIUS_CM,
+    };
+    return trunk.map((t): [Capsule, Capsule] => [arm, t]);
+  });
 }
 
 /** Bodies may sink this deep into each other before it is reported: flesh, the gi and grips squash. */
@@ -157,7 +189,7 @@ function selfPair(a: string, b: string): boolean {
 /**
  * Pairs of body parts that sink deeper than `toleranceCm` into each other: every part of one
  * fighter against every part of the other, and a fighter's own parts that cannot overlap
- * (selfPair). Only the deepest pair per part pair is kept (the torso is two capsules). Deepest first.
+ * (selfPair, upperArmThroughTrunk). Only the deepest pair per part pair is kept (the torso is two capsules). Deepest first.
  */
 export function bodyPenetrations(
   pose: CurrentPose,
@@ -172,6 +204,9 @@ export function bodyPenetrations(
     caps[f].forEach((a, i) => {
       for (const b of caps[f].slice(i + 1)) if (selfPair(a.part, b.part)) pairs.push([f, a, f, b]);
     });
+    for (const [arm, trunk] of upperArmThroughTrunk(pose.fighters[f])) {
+      pairs.push([f, arm, f, trunk]);
+    }
   }
   const deepest = new Map<string, Penetration>();
   for (const [fa, ca, fb, cb] of pairs) {

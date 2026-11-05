@@ -56,6 +56,26 @@ describe('bodyPenetrations', () => {
     }
   });
 
+  const armed = (elbowL: Vec3, handL: Vec3): CurrentFighterPose => ({ ...me, elbowL, handL });
+
+  it('flags an upper arm through its own chest', () => {
+    const [cx, cy, cz] = me.chest;
+    const through = armed([cx, cy + 3, cz + 2], [cx + 30, cy - 10, cz + 10]);
+    const hits = bodyPenetrations(makePose(through, translateFighter(me, [0, 0, 300])));
+    expect(hits.map((h) => h.between)).toContain('me upperArmL x me trunk');
+  });
+
+  it('leaves an arm hanging at the side or crossing in front of the chest', () => {
+    const [sx, sy, sz] = me.shoulderL;
+    const [cx, cy, cz] = me.chest;
+    const hanging = armed([sx, sy - 30, sz], [sx + 5, sy - 62, sz]);
+    const crossing = armed([cx + 22, cy, cz - 4], [cx + 15, cy - 5, cz + 25]);
+    for (const arm of [hanging, crossing]) {
+      const hits = bodyPenetrations(makePose(arm, translateFighter(me, [0, 0, 300])));
+      expect(hits.map((h) => h.between)).not.toContain('me upperArmL x me trunk');
+    }
+  });
+
   it('flags a forearm through its own head', () => {
     const folded = {
       ...me,
