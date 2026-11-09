@@ -80,11 +80,14 @@ bake_humanoids('content/techniques/<slug>.json')  # every frame, the site's timi
 The site's viewer shows the same mannequin (ADR 0004, addendum 2026-11-03):
 
 ```sh
-blender -b --factory-startup -P tools/blender/export_site_model.py -- apps/web/public/models/fighter.v1.glb
+blender -c extension install --enable mpfb   # once: MakeHuman for Blender (CC0 meshes)
+blender -b --factory-startup -P tools/blender/export_site_model.py -- apps/web/public/models/fighter.v3.glb
 blender -b --factory-startup -P tools/blender/rig_fixture.py -- poses.json apps/web/src/features/viewer/rig.fixture.json
 ```
 
-The first exports one white body (tinted by the viewer) at rest, with each bone's rest frame in
+The first exports one white body (tinted by the viewer) at rest: a realistic MakeHuman man
+in grappling shorts (`mpfb_body.py`, ADR 0004 addendum 2026-11-09: a fabric shell over the skin,
+on the same weights; its colours are a vertex colour the viewer multiplies the fighter's colour by) on the same bones, bound in MPFB's own rest pose, with each bone's rest frame in
 the scene extras. Bump `MODEL_VERSION` and the file name when the model changes, so the PWA cache
 moves on. The second writes the reference bone frames `rig.test.ts` checks the site's port of
 `bone_frames` against (`apps/web/src/features/viewer/rig.ts`): rerun it after any change to the

@@ -482,8 +482,10 @@ def _set_group(obj, bone):
     obj.vertex_groups.new(name=bone).add(range(len(obj.data.vertices)), 1.0, 'REPLACE')
 
 
-def _build_humanoid(fid, rgb):
-    q, refs = derived_points(upgrade_fighter(_humanoid_rest()))
+def _build_humanoid(fid, rgb, rest=None):
+    """Armature and procedural body of one fighter; `rest`: the v2-21 rest pose (default: the
+    standard body standing, _humanoid_rest)."""
+    q, refs = derived_points(rest or upgrade_fighter(_humanoid_rest()))
     col = bpy.data.collections[COLLECTION]
 
     # Armature: independent bones (no hierarchy), each posed directly from the joints.
