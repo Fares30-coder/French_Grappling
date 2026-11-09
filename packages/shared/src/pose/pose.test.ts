@@ -138,6 +138,22 @@ describe('currentPoseSchema', () => {
     expect(currentPoseSchema.safeParse({ ...clone(), hands: {} }).success).toBe(true);
   });
 
+  it('accepts thumb directions, all optional, of any length', () => {
+    const thumbs = { me: { L: [0, -2, 0.5] }, opponent: { R: [-0.6, 0.3, -1] } };
+    expect(currentPoseSchema.safeParse({ ...clone(), thumbs }).success).toBe(true);
+    expect(currentPoseSchema.safeParse({ ...clone(), thumbs: {} }).success).toBe(true);
+  });
+
+  it('rejects a thumb direction too short to point anywhere, or an unknown side', () => {
+    for (const thumbs of [
+      { me: { L: [0, 0, 0] } },
+      { me: { L: [0, 0.05, 0] } },
+      { me: { M: [0, 1, 0] } },
+    ]) {
+      expect(currentPoseSchema.safeParse({ ...clone(), thumbs }).success).toBe(false);
+    }
+  });
+
   it('rejects an unknown hand state, side or fighter', () => {
     for (const hands of [{ me: { L: 'pinch' } }, { me: { M: 'grip' } }, { third: { L: 'grip' } }]) {
       expect(currentPoseSchema.safeParse({ ...clone(), hands }).success).toBe(false);

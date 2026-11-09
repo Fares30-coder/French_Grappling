@@ -137,6 +137,25 @@ export const fighterPoseV2_21Schema = z.strictObject({
 });
 export type FighterPoseV2_21 = z.infer<typeof fighterPoseV2_21Schema>;
 
+/**
+ * A direction (any length above a millimetre, no unit): where the thumb side of a hand points.
+ * Without it the renderer derives the hand's roll from the elbow bend (the forearm never turns),
+ * which cannot show a pronated or supinated hand: a palm laid on an arm from the other side.
+ */
+const directionSchema = z
+  .tuple([z.number().finite(), z.number().finite(), z.number().finite()])
+  .refine(([x, y, z]) => Math.hypot(x, y, z) >= 0.1, 'direction too short');
+const fighterThumbsSchema = z.strictObject({
+  L: directionSchema.optional(),
+  R: directionSchema.optional(),
+});
+/** Thumb direction of the hands that need one (ADR 0002, addendum 2026-11-09); others are automatic. */
+export const thumbsSchema = z.strictObject({
+  me: fighterThumbsSchema.optional(),
+  opponent: fighterThumbsSchema.optional(),
+});
+export type Thumbs = z.infer<typeof thumbsSchema>;
+
 export const poseV2_21Schema = z.strictObject({
   skeleton: z.literal(SKELETON_V2_21),
   fighters: z.strictObject({
@@ -145,5 +164,6 @@ export const poseV2_21Schema = z.strictObject({
   }),
   camera: cameraSchema.optional(),
   hands: handsSchema.optional(),
+  thumbs: thumbsSchema.optional(),
 });
 export type PoseV2_21 = z.infer<typeof poseV2_21Schema>;

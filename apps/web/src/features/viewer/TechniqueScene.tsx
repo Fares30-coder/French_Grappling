@@ -7,6 +7,10 @@ import {
   DEFAULT_HOLD_MS,
   type FighterId,
   interpolatePose,
+  interpolateThumbs,
+  smoothstep,
+  type ThumbHints,
+  thumbHints,
 } from '@tatamap/shared';
 import {
   type ElementRef,
@@ -116,12 +120,23 @@ export function TechniqueScene({
   const prevStepIndexRef = useRef<number | null>(null);
   const prevStepsRef = useRef<ReadonlyArray<ViewerStep> | null>(null);
 
-  /** `hands`: the shown step's (a transition takes the next step's, like the videos). */
+  /**
+   * `hands`: the shown step's (a transition takes the next step's, like the videos); `thumbs`:
+   * the pose's own, or the hints of a transition (interpolateThumbs).
+   */
   const applyPose = useCallback(
-    (pose: CurrentPose, hands: CurrentPose['hands'] = pose.hands) => {
+    (
+      pose: CurrentPose,
+      hands: CurrentPose['hands'] = pose.hands,
+      thumbs: ThumbHints = thumbHints(pose.thumbs),
+    ) => {
       const { me, opponent } = pose.fighters;
-      meRef.current?.setPose(me, { other: opponent, hands: hands?.me });
-      opponentRef.current?.setPose(opponent, { other: me, hands: hands?.opponent });
+      meRef.current?.setPose(me, { other: opponent, hands: hands?.me, thumbs: thumbs.me });
+      opponentRef.current?.setPose(opponent, {
+        other: me,
+        hands: hands?.opponent,
+        thumbs: thumbs.opponent,
+      });
       invalidate(); // the canvas only renders on demand when stopped
     },
     [invalidate],
@@ -177,7 +192,11 @@ export function TechniqueScene({
     const a = steps[from]?.pose;
     const b = steps[to]?.pose;
     if (!a || !b) return;
-    applyPose(t === 0 ? a : interpolatePose(a, b, t), (t === 0 ? a : b).hands);
+    applyPose(
+      t === 0 ? a : interpolatePose(a, b, t),
+      (t === 0 ? a : b).hands,
+      interpolateThumbs(a.thumbs, b.thumbs, smoothstep(t)),
+    );
 
     // Entering a transition means entering the next step.
     const entered = t > 0 ? to : from;

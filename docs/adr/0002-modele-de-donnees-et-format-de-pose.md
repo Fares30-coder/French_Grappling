@@ -607,3 +607,14 @@ Dans « Format d'une pose », remplacer « `me` (dessous au départ, couleur #1D
 - Par étape, comme les articulations : une main peut tenir à l'étape 3 et lâcher à l'étape 4.
 
 **Portée.** Ajout optionnel qui laisse valides tous les documents existants : permis dans `v1-11` (D6, point 2), pas de nouvelle version ni de migration. Le viewer du site l'ignore pour l'instant (sphères, pas de mains). Le site n'étant pas encore déployé, aucun client en cache ne peut recevoir un champ qu'il ne connaît pas.
+
+## Addendum (2026-11-09) : orientation des mains
+
+**Décision.** Une pose `v2-21` peut dire vers où pointe le pouce de chaque main : `thumbs`, optionnel, `{ me?: { L?, R? }, opponent?: { L?, R? } }`, chaque main valant une direction `[x, y, z]` (repère des poses, sans unité, d'au moins 0,1 de long). Une main absente garde l'orientation automatique, déduite du pli du coude. Le rendu tourne l'avant-bras autour de son axe pour amener le pouce vers cette direction (pronation, supination) : la moitié de la rotation dans l'avant-bras, l'autre dans la main, comme le radius autour du cubitus. Seule la composante perpendiculaire à l'avant-bras compte. En transition, une direction donnée aux deux étapes tourne sur un grand cercle, et une direction donnée à une seule étape apparaît ou s'efface progressivement face à l'orientation automatique (`interpolateThumbs`, `interpolate_thumbs`). Le miroir inverse z et passe la direction à l'autre main.
+
+**Raisons.**
+- Sans elle, la paume est liée au plan du bras : l'avant-bras ne tourne jamais. Une prise comme le haut du triceps dans l'arm drag (paume posée sur la face extérieure du bras adverse, coude bas) était impossible. Le contournement obligeait à passer l'avant-bras sous l'aisselle, ce qui faisait traverser les bras pendant le tirage.
+- Une direction reste dans l'esprit du format (D1) : de la géométrie dans le repère des poses, rien de propre au moteur. Un angle de roulis aurait dépendu de la référence que le rendu choisit.
+- Optionnelle et par main : les poses existantes ne changent pas, et on ne la donne qu'aux prises qui en ont besoin.
+
+**Portée.** Ajout optionnel au schéma `v2-21` seulement (`v1-11` reste gelé) : tous les documents existants restent valides, pas de nouvelle version ni de migration. Le rendu du site (`rig.ts`) et celui des vidéos (`tatamap_humanoid.py`) l'appliquent de la même façon, vérifié par la référence Blender de `rig.test.ts` (une pose avec `thumbs`). L'éditeur de poses la conserve mais ne permet pas encore de la régler : on l'écrit dans le fichier de contenu.

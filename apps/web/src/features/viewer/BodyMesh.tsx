@@ -4,6 +4,7 @@ import {
   FIGHTER_COLORS,
   type FighterId,
   type HandState,
+  type ThumbHint,
 } from '@tatamap/shared';
 import { type Ref, useImperativeHandle, useLayoutEffect, useMemo, useRef } from 'react';
 import {
@@ -25,6 +26,8 @@ export const BODY_MODEL_URL = '/models/fighter.v1.glb';
 export type PoseContext = {
   other?: CurrentFighterPose | undefined;
   hands?: Partial<Record<'L' | 'R', HandState>> | undefined;
+  /** Thumb hints of the shown pose (pose `thumbs`, faded during a transition). */
+  thumbs?: Partial<Record<'L' | 'R', ThumbHint>> | undefined;
 };
 
 export type BodyMeshHandle = {
@@ -174,6 +177,7 @@ export function BodyMesh({ fighter, ref, translucent = false, initialPose, onRea
         const { bones, state } = boneFrames(pose, {
           other: context.other,
           hands: context.hands,
+          thumbs: context.thumbs,
           prev,
           dtSeconds: prev ? dt : 0,
         });

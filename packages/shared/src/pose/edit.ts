@@ -16,6 +16,7 @@ import {
   POSE_BOUNDS_CM,
   type Vec3,
 } from './skeleton-v1-11';
+import type { Thumbs } from './skeleton-v2-21';
 
 const flipZ = ([x, y, z]: Vec3): Vec3 => [x, y, 0 - z];
 
@@ -43,6 +44,7 @@ export function mirrorPose(pose: CurrentPose): CurrentPose {
     },
     ...(camera ? { camera } : {}),
     ...(pose.hands ? { hands: mirrorHands(pose.hands) } : {}),
+    ...(pose.thumbs ? { thumbs: mirrorThumbs(pose.thumbs) } : {}),
   };
 }
 
@@ -54,6 +56,20 @@ function mirrorHands(hands: Hands): Hands {
     mirrored[fighter] = {
       ...(own.R ? { L: own.R } : {}),
       ...(own.L ? { R: own.L } : {}),
+    };
+  }
+  return mirrored;
+}
+
+/** A thumb direction mirrors like a point (z flipped) and moves to the other hand. */
+function mirrorThumbs(thumbs: Thumbs): Thumbs {
+  const mirrored: Thumbs = {};
+  for (const fighter of FIGHTERS) {
+    const own = thumbs[fighter];
+    if (!own) continue;
+    mirrored[fighter] = {
+      ...(own.R ? { L: flipZ(own.R) } : {}),
+      ...(own.L ? { R: flipZ(own.L) } : {}),
     };
   }
   return mirrored;

@@ -39,7 +39,9 @@ def main(src, out):
         for fid in ('me', 'opponent'):
             f, other = pose['fighters'][fid], pose['fighters'][other_of[fid]]
             hands = (pose.get('hands') or {}).get(fid)
-            bones, _state = bone_frames(f, None, other, hands)
+            thumbs = {s: {'dir': d, 'weight': 1.0}
+                      for s, d in ((pose.get('thumbs') or {}).get(fid) or {}).items()}
+            bones, _state = bone_frames(f, None, other, hands, thumbs)
             cases.append({'pose': i, 'fighter': fid, 'bones': _plain(bones)})
     a, b = poses[0]['fighters'], poses[1]['fighters']
     frames, prev = [], None

@@ -191,6 +191,27 @@ def slerp_unit(a, b, t, eps=1e-6):
     return _add(_scale(a, math.sin((1 - t) * angle) / s), _scale(b, math.sin(t * angle) / s))
 
 
+def interpolate_thumbs(a, b, t):
+    """Thumb hints between two poses' `thumbs` at eased time t (interpolateThumbs in
+    interpolate.ts): {fighter: {side: {'dir': unit, 'weight': w}}}."""
+    out = {}
+    for fid in ('me', 'opponent'):
+        for side in 'LR':
+            src = ((a or {}).get(fid) or {}).get(side)
+            dst = ((b or {}).get(fid) or {}).get(side)
+            if src and dst:
+                hint = {'dir': slerp_unit(_scale(src, 1 / _len(src)), _scale(dst, 1 / _len(dst)), t),
+                        'weight': 1.0}
+            elif src and t < 1:
+                hint = {'dir': _scale(src, 1 / _len(src)), 'weight': 1 - t}
+            elif dst and t > 0:
+                hint = {'dir': _scale(dst, 1 / _len(dst)), 'weight': t}
+            else:
+                continue
+            out.setdefault(fid, {})[side] = hint
+    return out
+
+
 def interpolate_fighter(a, b, t):
     """The root moves in a straight line, each bone of BONE_CHAIN turns along a great circle and
     changes length linearly; no joint goes lower than at both steps."""
