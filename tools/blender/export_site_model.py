@@ -2,7 +2,10 @@
 
     blender -b --factory-startup -P tools/blender/export_site_model.py -- out.glb
 
-One white body (the viewer tints it per fighter) on its armature, at rest. The bones are
+Needs the MPFB extension (`blender -c extension install --enable mpfb`): the skin is a
+MakeHuman man (CC0), see mpfb_body.py. One white body (the viewer tints it per fighter) on its
+armature, at rest (MPFB's skeleton, read as a v2-21 pose). The shorts are a vertex colour
+(COLOR_0) the viewer multiplies the fighter's colour by. The bones are
 independent (no hierarchy) and the viewer places each one from the joints like
 `pose_humanoid`, so it needs each bone's rest frame: they are written in the scene's extras
 (`tatamapRest`: bone -> [head, tail, z axis], Tatamap cm), with `tatamapModel` (the version).
@@ -18,13 +21,15 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 exec(open(os.path.join(HERE, 'tatamap_rig.py')).read())
 exec(open(os.path.join(HERE, 'tatamap_humanoid.py')).read())
+exec(open(os.path.join(HERE, 'mpfb_body.py')).read())
 
-MODEL_VERSION = 1
+MODEL_VERSION = 3
 
 
-def rest_frames():
-    """Each bone's (head, tail, z) at rest, as `bone_frames` gives them (hands relaxed)."""
-    q, refs = derived_points(_humanoid_rest())
+def rest_frames(rest):
+    """Each bone's (head, tail, z) at rest, as `bone_frames` gives them (hands relaxed), for
+    the v2-21 rest pose `rest`."""
+    q, refs = derived_points(rest)
     bones = {n: (q[h], q[t], _axes(q[h], q[t], refs[r])[2]) for n, (h, t, r) in HBONES.items()}
     for s, sign in (('L', 1), ('R', -1)):
         bones['deltoid.' + s] = _deltoid(bones['clavicle.' + s], bones['upper_arm.' + s])
@@ -38,11 +43,11 @@ def export(path):
         bpy.data.objects.remove(obj)
     col = bpy.data.collections.new(COLLECTION)
     scene.collection.children.link(col)
-    rig, body = _build_humanoid('fighter', (1.0, 1.0, 1.0))
+    rig, body, rest_pose = build_mpfb_humanoid('fighter', (1.0, 1.0, 1.0))
     body.modifiers['Armature'].use_deform_preserve_volume = False  # glTF skins are linear
     body.data.materials.clear()
-    body.data.materials.append(_material('fighter_skin', (1.0, 1.0, 1.0), 0.55))
-    rest = rest_frames()
+    body.data.materials.append(_tinted_material(_material('fighter_skin', (1.0, 1.0, 1.0), 0.55)))
+    rest = rest_frames(rest_pose)
     missing = set(rest) ^ {b.name for b in rig.data.bones}
     assert not missing, f'rest frames and armature differ: {missing}'
     scene['tatamapModel'] = MODEL_VERSION
@@ -53,7 +58,8 @@ def export(path):
     bpy.ops.export_scene.gltf(
         filepath=path, export_format='GLB', use_selection=True, export_extras=True,
         export_yup=True, export_skins=True, export_animations=False, export_morph=False,
-        export_def_bones=False, export_texcoords=False, export_cameras=False, export_lights=False)
+        export_def_bones=False, export_texcoords=False, export_vertex_color='ACTIVE',
+        export_cameras=False, export_lights=False)
     print(f'exported {path}: {len(body.data.vertices)} vertices, {len(body.data.polygons)} faces')
 
 

@@ -20,7 +20,7 @@ import { applyDualQuaternionSkinning, createBoneTexture, writeBone } from './dq-
 import { type BoneFrame, boneAxes, boneFrames, type RigState } from './rig';
 
 /** The humanoid model (tools/blender/export_site_model.py), versioned so the PWA cache moves on. */
-export const BODY_MODEL_URL = '/models/fighter.v1.glb';
+export const BODY_MODEL_URL = '/models/fighter.v3.glb';
 
 /** What else a body needs to pose its hands: the opponent (automatic grips) and the step's hands. */
 export type PoseContext = {
@@ -101,6 +101,7 @@ function buildBody(scene: Object3D, rest: Rest, color: string, translucent: bool
   const material = new MeshStandardMaterial({
     color,
     roughness: 0.55,
+    vertexColors: true, // the shorts: a darker shade of the fighter's colour (COLOR_0)
     ...(translucent ? { transparent: true, opacity: TRANSLUCENT_OPACITY, depthWrite: false } : {}),
   });
   let mesh: SkinnedMesh | null = null;
