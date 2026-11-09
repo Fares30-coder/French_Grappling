@@ -5,7 +5,8 @@ import {
   type CurrentJoint,
   type CurrentPose,
 } from './pose';
-import { FIGHTERS, type Vec3 } from './skeleton-v1-11';
+import { FIGHTERS, type FighterId, HAND_SIDES, type HandSide, type Vec3 } from './skeleton-v1-11';
+import type { Thumbs } from './skeleton-v2-21';
 
 /** Ease in/out; `t` is clamped to [0, 1]. */
 export function smoothstep(t: number): number {
@@ -102,4 +103,43 @@ export function interpolatePose(a: CurrentPose, b: CurrentPose, t: number): Curr
       [second]: fighter(second),
     } as CurrentPose['fighters'],
   };
+}
+
+/**
+ * A hand's thumb direction for the renderer, and how much it overrides the automatic one
+ * (1 = fully; 0 = not at all). Only a pose's own `thumbs` have weight 1; a transition fades it.
+ */
+export type ThumbHint = { dir: Vec3; weight: number };
+export type ThumbHints = Partial<Record<FighterId, Partial<Record<HandSide, ThumbHint>>>>;
+
+const unitOf = (a: Vec3): Vec3 => scale(a, 1 / norm(a));
+
+/** A pose's thumbs as hints of full weight. */
+export function thumbHints(thumbs: Thumbs | undefined): ThumbHints {
+  return interpolateThumbs(thumbs, thumbs, 0);
+}
+
+/**
+ * Thumb hints between two steps at eased time `s` (as interpolatePose): a direction both steps
+ * give turns along a great circle; one only one step gives fades in (or out) against the
+ * automatic direction, which the renderer works out from the arm.
+ */
+export function interpolateThumbs(
+  a: Thumbs | undefined,
+  b: Thumbs | undefined,
+  s: number,
+): ThumbHints {
+  const out: ThumbHints = {};
+  for (const fighter of FIGHTERS) {
+    for (const side of HAND_SIDES) {
+      const from = a?.[fighter]?.[side];
+      const to = b?.[fighter]?.[side];
+      let hint: ThumbHint | null = null;
+      if (from && to) hint = { dir: slerpUnit(unitOf(from), unitOf(to), s), weight: 1 };
+      else if (from && s < 1) hint = { dir: unitOf(from), weight: 1 - s };
+      else if (to && s > 0) hint = { dir: unitOf(to), weight: s };
+      if (hint) out[fighter] = { ...out[fighter], [side]: hint };
+    }
+  }
+  return out;
 }

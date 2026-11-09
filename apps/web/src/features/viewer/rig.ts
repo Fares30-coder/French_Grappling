@@ -1,4 +1,4 @@
-import type { CurrentFighterPose, CurrentJoint, HandState, Vec3 } from '@tatamap/shared';
+import type { CurrentFighterPose, CurrentJoint, HandState, ThumbHint, Vec3 } from '@tatamap/shared';
 import { Quaternion, Vector3 } from 'three';
 
 /**
@@ -122,6 +122,19 @@ function swingRef(
     .add(fwd.clone().multiplyScalar(z.z));
 }
 
+/**
+ * Turn (rad) about the forearm `axis` from the automatic thumb direction to the hint's, scaled by
+ * the hint's weight; 0 without a hint or when either direction runs along the forearm.
+ */
+function thumbTurn(auto: Vector3, axis: Vector3, hint: ThumbHint | undefined): number {
+  if (!hint || hint.weight <= 0) return 0;
+  const flat = (d: Vector3) => d.clone().sub(axis.clone().multiplyScalar(d.dot(axis)));
+  const from = flat(auto);
+  const to = flat(v(hint.dir));
+  if (from.length() < 1e-3 || to.length() < 1e-3) return 0;
+  return Math.atan2(axis.dot(from.clone().cross(to)), from.dot(to)) * Math.min(1, hint.weight);
+}
+
 type Points = Record<string, Vector3>;
 type Refs = Record<string, Vector3>;
 
@@ -130,6 +143,7 @@ export function derivedPoints(
   f: CurrentFighterPose,
   prevForward: Vector3 | null = null,
   maxTurnDeg = Infinity,
+  thumbs: Partial<Record<'L' | 'R', ThumbHint>> = {},
 ): { q: Points; refs: Refs } {
   const { up, fwd, left } = bodyFrame(f, prevForward, maxTurnDeg);
   const hip = v(f.pelvis);
@@ -170,7 +184,11 @@ export function derivedPoints(
     q[`toe${s}`] = v(f[`toe${s}`]);
     const elbowDir = bendDir(shoulderPt, elbow, wrist, fwd.clone().multiplyScalar(-1));
     refs[`elbow${s}`] = elbowDir;
-    refs[`thumb${s}`] = elbowDir.clone().multiplyScalar(-1);
+    // The hand's roll follows the elbow bend unless the pose turns it: then the forearm turns
+    // about its own axis (pronation, supination), half in the forearm and half in the hand.
+    const turn = thumbTurn(elbowDir.clone().multiplyScalar(-1), fore, thumbs[s]);
+    refs[`forearm_roll${s}`] = elbowDir.clone().applyAxisAngle(fore, turn / 2);
+    refs[`thumb${s}`] = elbowDir.clone().multiplyScalar(-1).applyAxisAngle(fore, turn);
     refs[`knee${s}`] = kneeDir;
     refs[`foot_top${s}`] = knee.clone().sub(foot);
     refs[`arm_swing${s}`] = swingRef(elbow.clone().sub(shoulderPt), up, fwd, left, ARM_SWING_REST);
@@ -192,7 +210,7 @@ export const HUMANOID_BONES: ReadonlyArray<readonly [string, string, string, str
         [`clavicle.${s}`, 'clav', `shoulder${s}`, 'fwd'],
         [`upper_arm.${s}`, `shoulder${s}`, `elbow${s}`, `arm_swing${s}`],
         [`upper_arm_twist.${s}`, `shoulder${s}`, `elbow${s}`, `elbow${s}`],
-        [`forearm.${s}`, `elbow${s}`, `wrist${s}`, `elbow${s}`],
+        [`forearm.${s}`, `elbow${s}`, `wrist${s}`, `forearm_roll${s}`],
         [`hand.${s}`, `wrist${s}`, `finger${s}`, `thumb${s}`],
         [`thigh.${s}`, `hipj${s}`, `knee${s}`, `leg_swing${s}`],
         [`thigh_twist.${s}`, `hipj${s}`, `knee${s}`, `knee${s}`],
@@ -362,6 +380,8 @@ export type BoneFramesInput = {
   other?: CurrentFighterPose | undefined;
   /** This fighter's entry of the pose's `hands`; a hand left out is automatic. */
   hands?: Partial<Record<'L' | 'R', HandState>> | undefined;
+  /** This fighter's thumb hints (pose `thumbs`, faded in transitions); a hand left out is automatic. */
+  thumbs?: Partial<Record<'L' | 'R', ThumbHint>> | undefined;
   /** The previous frame's state, and the time since (s): facing, rolls and hands turn smoothly. */
   prev?: RigState | null | undefined;
   dtSeconds?: number;
@@ -370,10 +390,10 @@ export type BoneFramesInput = {
 /** Each bone's frame for a fighter, and the state to pass as `prev` to the next frame. */
 export function boneFrames(
   f: CurrentFighterPose,
-  { other, hands, prev = null, dtSeconds = 1 / 30 }: BoneFramesInput = {},
+  { other, hands, thumbs, prev = null, dtSeconds = 1 / 30 }: BoneFramesInput = {},
 ): { bones: BoneFrames; state: RigState } {
   const maxTurnDeg = MAX_TURN_DEG_PER_S * dtSeconds;
-  const { q, refs } = derivedPoints(f, prev?.fwd ?? null, maxTurnDeg);
+  const { q, refs } = derivedPoints(f, prev?.fwd ?? null, maxTurnDeg, thumbs);
   const bones: BoneFrames = new Map();
   for (const [name, h, t, r] of HUMANOID_BONES) {
     const head = q[h] as Vector3;

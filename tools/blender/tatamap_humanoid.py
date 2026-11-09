@@ -31,7 +31,7 @@ from mathutils import Matrix, Vector
 from mathutils.geometry import intersect_point_line
 
 try:
-    from tatamap_pose import interpolate_fighter, load_technique, upgrade_fighter
+    from tatamap_pose import interpolate_fighter, interpolate_thumbs, load_technique, upgrade_fighter
 except ImportError as error:  # exec'd without tools/blender on sys.path
     raise ImportError("put tools/blender on sys.path first: "
                       "import sys; sys.path.insert(0, '/path/to/tools/blender')") from error
@@ -112,8 +112,23 @@ def _swing_ref(direction, up, fwd, left, rest):
     return left * z.x + up * z.y + fwd * z.z
 
 
-def derived_points(f, prev_forward=None):
-    """Humanoid points (cm) and bone roll references for a v2-21 fighter."""
+def _thumb_turn(auto, axis, hint):
+    """Turn (rad) about the forearm `axis` from the automatic thumb direction to the hint's
+    ({'dir': (x, y, z), 'weight': 0..1}), scaled by the weight; 0 without a hint or when either
+    direction runs along the forearm. Same as `thumbTurn` in the site's rig.ts."""
+    if not hint or hint['weight'] <= 0:
+        return 0.0
+    src = auto - axis * auto.dot(axis)
+    want = _v(hint['dir'])
+    dst = want - axis * want.dot(axis)
+    if src.length < 1e-3 or dst.length < 1e-3:
+        return 0.0
+    return math.atan2(axis.dot(src.cross(dst)), src.dot(dst)) * min(1.0, hint['weight'])
+
+
+def derived_points(f, prev_forward=None, thumbs=None):
+    """Humanoid points (cm) and bone roll references for a v2-21 fighter. `thumbs`: thumb
+    hints per hand ({'L': {'dir': ..., 'weight': ...}}, pose `thumbs` have weight 1)."""
     up, fwd, left = _frame(f, prev_forward)
     p = {k: _v(val) for k, val in f.items()}
     hip, neck, head = p['pelvis'], p['neck'], p['head']
@@ -146,7 +161,11 @@ def derived_points(f, prev_forward=None):
         knee = _bend_dir(q['hipj' + s], q['knee' + s], q['ankle' + s], fwd)
         elbow = _bend_dir(q['shoulder' + s], q['elbow' + s], q['wrist' + s], -fwd)
         refs['elbow' + s] = elbow
-        refs['thumb' + s] = -elbow
+        # The hand's roll follows the elbow bend unless the pose turns it: then the forearm
+        # turns about its own axis (pronation, supination), half in the forearm, half in the hand.
+        turn = _thumb_turn(-elbow, fore, (thumbs or {}).get(s))
+        refs['forearm_roll' + s] = Matrix.Rotation(turn / 2, 3, fore) @ elbow
+        refs['thumb' + s] = Matrix.Rotation(turn, 3, fore) @ -elbow
         refs['knee' + s] = knee
         refs['foot_top' + s] = q['knee' + s] - q['ankle' + s]
         refs['arm_swing' + s] = _swing_ref(q['elbow' + s] - q['shoulder' + s], up, fwd, left,
@@ -169,7 +188,7 @@ for _s in 'LR':
         f'clavicle.{_s}': ('clav', 'shoulder' + _s, 'fwd'),
         f'upper_arm.{_s}': ('shoulder' + _s, 'elbow' + _s, 'arm_swing' + _s),
         f'upper_arm_twist.{_s}': ('shoulder' + _s, 'elbow' + _s, 'elbow' + _s),
-        f'forearm.{_s}': ('elbow' + _s, 'wrist' + _s, 'elbow' + _s),
+        f'forearm.{_s}': ('elbow' + _s, 'wrist' + _s, 'forearm_roll' + _s),
         f'hand.{_s}': ('wrist' + _s, 'finger' + _s, 'thumb' + _s),
         f'thigh.{_s}': ('hipj' + _s, 'knee' + _s, 'leg_swing' + _s),
         f'thigh_twist.{_s}': ('hipj' + _s, 'knee' + _s, 'knee' + _s),
@@ -600,12 +619,13 @@ def grip_amount(f, s, other=None):
     return _smoothstep(min(1.0, max(0.0, (hi - gap) / (hi - lo))))
 
 
-def bone_frames(f, prev=None, other=None, hands=None):
+def bone_frames(f, prev=None, other=None, hands=None, thumbs=None):
     """Each bone's (head, tail, z axis) in Tatamap cm for a v2-21 fighter, and the state to
     pass as `prev` for the next frame: rolls then turn at most MAX_TURN_DEG per frame, and
     hand shapes change at most GRIP_SPEED per frame. `hands`: the fighter's entry of the pose's
-    `hands` ({'L': 'grip' | 'push' | 'free'}); a hand left out closes on `other` (auto)."""
-    q, refs = derived_points(f, prev['fwd'] if prev else None)
+    `hands` ({'L': 'grip' | 'push' | 'free'}); a hand left out closes on `other` (auto).
+    `thumbs`: thumb hints per hand, see `derived_points`."""
+    q, refs = derived_points(f, prev['fwd'] if prev else None, thumbs)
     bones = {}
     for name, (h, t, ref) in HBONES.items():
         _x, y, z = _axes(q[h], q[t], refs[ref])
@@ -631,10 +651,10 @@ def bone_frames(f, prev=None, other=None, hands=None):
     return bones, state
 
 
-def pose_humanoid(rig, f, prev=None, other=None, hands=None):
+def pose_humanoid(rig, f, prev=None, other=None, hands=None, thumbs=None):
     """Poses a humanoid rig on a v2-21 fighter (`other`: the opponent's joints, for automatic
-    grips; `hands`: its hand states); returns the state for the next frame."""
-    bones, state = bone_frames(f, prev, other, hands)
+    grips; `hands`: its hand states; `thumbs`: its thumb hints); returns the next frame's state."""
+    bones, state = bone_frames(f, prev, other, hands, thumbs)
     inv = rig.matrix_world.inverted()
     origin = to_bl((0, 0, 0))
     for name, (head, tail, z) in bones.items():
@@ -679,11 +699,28 @@ def site_hands(technique):
     return frames
 
 
+def site_thumbs(technique):
+    """Thumb hints for every frame of site_timeline: a step's own `thumbs` while it is held,
+    interpolated towards the next step's during the transition (as the site does)."""
+    steps = technique['steps']
+    hold = round(HOLD_MS / 1000 * FPS)
+    frames = []
+    for i, step in enumerate(steps):
+        own = step['pose'].get('thumbs')
+        frames += [interpolate_thumbs(own, own, 0)] * hold
+        if i + 1 < len(steps):
+            nxt = steps[i + 1]['pose'].get('thumbs')
+            n = max(1, round(steps[i + 1]['transitionMs'] / 1000 * FPS))
+            frames += [interpolate_thumbs(own, nxt, _smoothstep(k / n)) for k in range(1, n + 1)]
+    return frames
+
+
 def bake_humanoids(technique_path, start_frame=1):
     """Keys the humanoids on every frame of the technique, with the site's timing."""
     technique = load_technique(technique_path)  # poses upgraded to v2-21
     frames = site_timeline(technique)
     hands = site_hands(technique)
+    thumbs = site_thumbs(technique)
     rigs = {fid: bpy.data.objects[fid + HUMANOID_SUFFIX] for fid in FIGHTERS}
     for rig in rigs.values():
         rig.animation_data_clear()
@@ -694,7 +731,8 @@ def bake_humanoids(technique_path, start_frame=1):
         frame = start_frame + k
         for fid, rig in rigs.items():
             other = poses['opponent' if fid == 'me' else 'me']
-            prev[fid] = pose_humanoid(rig, poses[fid], prev[fid], other, hands[k].get(fid))
+            prev[fid] = pose_humanoid(rig, poses[fid], prev[fid], other, hands[k].get(fid),
+                                      thumbs[k].get(fid))
             bpy.context.view_layer.update()
             for pb in rig.pose.bones:
                 pb.keyframe_insert('location', frame=frame)

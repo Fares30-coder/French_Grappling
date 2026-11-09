@@ -1,4 +1,9 @@
-import type { CurrentFighterPose, CurrentPose, FighterId } from '@tatamap/shared';
+import {
+  type CurrentFighterPose,
+  type CurrentPose,
+  type FighterId,
+  thumbHints,
+} from '@tatamap/shared';
 import { Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import { type BoneFrames, boneFrames, type RigState } from './rig';
@@ -48,12 +53,13 @@ function worstGap(ours: BoneFrames, blender: Record<string, Frame>) {
 }
 
 describe('boneFrames (parity with the Blender mannequin)', () => {
-  it('poses every bone like Blender, hands and automatic grips included', () => {
+  it('poses every bone like Blender, hands, thumbs and automatic grips included', () => {
     for (const c of data.cases) {
       const pose = data.poses[c.pose] as CurrentPose;
       const { bones } = boneFrames(pose.fighters[c.fighter], {
         other: pose.fighters[other(c.fighter)],
         hands: pose.hands?.[c.fighter],
+        thumbs: thumbHints(pose.thumbs)[c.fighter],
       });
       const gap = worstGap(bones, c.bones);
       expect(gap.points, `pose ${c.pose} ${c.fighter}`).toBeLessThan(0.01);
@@ -86,6 +92,36 @@ describe('boneFrames', () => {
     expect(bones.get('forearm.L')?.head.distanceTo(new Vector3(...f.elbowL))).toBeCloseTo(0);
     expect(bones.get('shin.R')?.tail.distanceTo(new Vector3(...f.footR))).toBeCloseTo(0);
     expect(bones.get('head')?.head.distanceTo(new Vector3(...f.neck))).toBeGreaterThan(0);
+  });
+
+  it('turns the hand and half the forearm about the forearm towards the thumb direction', () => {
+    const f = pose.fighters.me;
+    const fore = new Vector3(...f.handL).sub(new Vector3(...f.elbowL)).normalize();
+    const flat = (d: Vector3) =>
+      d
+        .clone()
+        .sub(fore.clone().multiplyScalar(d.dot(fore)))
+        .normalize();
+    const auto = boneFrames(f).bones;
+    const autoZ = flat(auto.get('hand.L')?.z as Vector3);
+    // The opposite of the automatic thumb: a half turn of the hand, a quarter of the forearm.
+    const wanted = autoZ.clone().negate();
+    const turned = boneFrames(f, {
+      thumbs: { L: { dir: [wanted.x, wanted.y, wanted.z], weight: 1 } },
+    }).bones;
+    const angle = (name: string) =>
+      flat(turned.get(name)?.z as Vector3).angleTo(flat(auto.get(name)?.z as Vector3));
+    expect(angle('hand.L')).toBeCloseTo(Math.PI, 1);
+    expect(angle('forearm.L')).toBeCloseTo(Math.PI / 2, 1);
+    expect(angle('upper_arm_twist.L')).toBeCloseTo(0);
+    expect(turned.get('hand.L')?.tail.distanceTo(auto.get('hand.L')?.tail as Vector3)).toBeCloseTo(
+      0,
+    );
+    // No weight: the automatic roll.
+    const none = boneFrames(f, {
+      thumbs: { L: { dir: [wanted.x, wanted.y, wanted.z], weight: 0 } },
+    }).bones;
+    expect(flat(none.get('hand.L')?.z as Vector3).angleTo(autoZ)).toBeCloseTo(0);
   });
 
   it('closes a gripping hand and opens a pushing one', () => {

@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   interpolateFighter,
   interpolatePose,
+  interpolateThumbs,
   lerpVec3,
   slerpUnit,
   smoothstep,
+  thumbHints,
 } from './interpolate';
 import { CURRENT_BONE_CHAIN, CURRENT_JOINTS, CURRENT_SKELETON, type CurrentPose } from './pose';
 import type { Vec3 } from './skeleton-v1-11';
@@ -136,5 +138,29 @@ describe('interpolateFighter on the mat', () => {
     for (const s of [0.25, 0.5, 0.75]) {
       expect(interpolateFighter(before, after, s).footL[1]).toBeGreaterThanOrEqual(6);
     }
+  });
+});
+
+describe('interpolateThumbs', () => {
+  const up = { me: { L: [0, 2, 0] as Vec3 } };
+  const side = { me: { L: [0, 0, 1] as Vec3 } };
+
+  it("gives a pose's own thumbs, as unit directions, full weight", () => {
+    expect(thumbHints(up)).toEqual({ me: { L: { dir: [0, 1, 0], weight: 1 } } });
+    expect(thumbHints(undefined)).toEqual({});
+  });
+
+  it('turns a direction both steps give along a great circle', () => {
+    const mid = interpolateThumbs(up, side, 0.5).me?.L;
+    expect(mid?.weight).toBe(1);
+    expect(mid?.dir[1]).toBeCloseTo(Math.SQRT1_2);
+    expect(mid?.dir[2]).toBeCloseTo(Math.SQRT1_2);
+  });
+
+  it('fades a direction only one step gives in or out against the automatic one', () => {
+    expect(interpolateThumbs(up, undefined, 0.25).me?.L).toEqual({ dir: [0, 1, 0], weight: 0.75 });
+    expect(interpolateThumbs(undefined, up, 0.25).me?.L).toEqual({ dir: [0, 1, 0], weight: 0.25 });
+    expect(interpolateThumbs(up, undefined, 1)).toEqual({});
+    expect(interpolateThumbs(undefined, up, 0)).toEqual({});
   });
 });

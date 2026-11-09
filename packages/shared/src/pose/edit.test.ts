@@ -51,6 +51,16 @@ describe('mirrorPose', () => {
     expect(mirrorPose(mirrorPose(pose))).toEqual(pose);
     expect('hands' in mirrorPose(validPose)).toBe(false);
   });
+
+  it('mirrors each thumb direction and moves it to the other hand', () => {
+    const pose = {
+      ...validPose,
+      thumbs: { me: { L: [1, 2, 3] as [number, number, number] } },
+    };
+    expect(mirrorPose(pose).thumbs).toEqual({ me: { R: [1, 2, -3] } });
+    expect(mirrorPose(mirrorPose(pose))).toEqual(pose);
+    expect('thumbs' in mirrorPose(validPose)).toBe(false);
+  });
 });
 
 describe('withHandState', () => {
