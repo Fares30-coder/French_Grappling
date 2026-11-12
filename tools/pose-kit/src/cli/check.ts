@@ -1,16 +1,19 @@
 import { loadTechnique, resolveTechniqueFile } from '../load';
 import { countIssues, formatReport, reportTechnique } from '../report';
 
-const USAGE = `Usage: pnpm pose:check <slug|path.json> [--strict]
+const USAGE = `Usage: pnpm pose:check <slug|path.json> [--strict] [--steps-only]
 
 Checks one technique of CONTENT_DIR (default content/): schema (blocking), bone lengths against
-the standard body (same 12 % rule as the editor), joints under the mat, rough overlap between fighters,
+the standard body (same 12 % rule as the editor), joints under the mat, joints outside the human
+range (back, knees turned round, feet, elbows, wrists, head; at the steps and inside transitions), rough overlap between fighters,
 body parts sinking into each other (the mannequin's volume; pnpm pose:separate pushes them apart).
 Overlap detection is an APPROXIMATE heuristic on the bare skeleton: treat it as a hint.
+--steps-only skips the transitions (steps that do not follow each other, as poses-de-reference).
 Exit code 1 on an invalid file, or on any warning with --strict.`;
 
 const args = process.argv.slice(2);
 const strict = args.includes('--strict');
+const stepsOnly = args.includes('--steps-only');
 const target = args.find((a) => !a.startsWith('--'));
 if (!target || args.includes('--help')) {
   console.log(USAGE);
@@ -32,7 +35,7 @@ if (!loaded.ok) {
   process.exit(1);
 }
 
-const reports = reportTechnique(loaded.technique);
+const reports = reportTechnique(loaded.technique, { stepsOnly });
 console.log(formatReport(loaded.technique, reports));
 const issues = countIssues(reports);
 console.log(issues === 0 ? '\nNo warning.' : `\n${issues} warning(s) (not blocking).`);
