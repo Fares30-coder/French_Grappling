@@ -1,5 +1,6 @@
 import { Link, Outlet, ScrollRestoration, useLocation } from 'react-router';
 import { LogoMark } from '../../ui/Logo';
+import { AdRail } from '../ads/AdRail';
 import { useOnline } from '../offline/use-online';
 import { isActive, NAV_ITEMS } from './nav';
 
@@ -112,6 +113,7 @@ export function PublicLayout() {
           <Outlet />
         </div>
       </div>
+      <AdRail pathname={pathname} />
       <TabBar pathname={pathname} />
       <ScrollRestoration />
     </div>

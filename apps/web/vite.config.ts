@@ -1,6 +1,6 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 const apiProxy = { '/api': process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:3000' };
@@ -15,10 +15,32 @@ const isPublicApiRead = ({ url, request }: { url: URL; request: Request }) =>
   !url.pathname.startsWith('/api/admin') &&
   !url.pathname.startsWith('/api/auth');
 
+/** Emits `ads.txt` (required by AdSense) when VITE_ADSENSE_CLIENT is set at build time. */
+function adsTxt(): Plugin {
+  let client: string | undefined;
+  return {
+    name: 'tatamap-ads-txt',
+    apply: 'build',
+    configResolved(config) {
+      client = config.env.VITE_ADSENSE_CLIENT;
+    },
+    generateBundle() {
+      if (!client) return;
+      const publisher = client.replace(/^ca-/, '');
+      this.emitFile({
+        type: 'asset',
+        fileName: 'ads.txt',
+        source: `google.com, ${publisher}, DIRECT, f08c47fec0942fa0\n`,
+      });
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    adsTxt(),
     // Offline at the club (phase 3, lot 7). Production build only (not in `vite` dev).
     VitePWA({
       registerType: 'autoUpdate',
