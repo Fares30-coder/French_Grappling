@@ -276,10 +276,22 @@ const THUMB_FLAT: ReadonlyArray<Vec3> = [
 /** Hand shape of each state: -1 flat, 0 relaxed, 1 fist. */
 export const HAND_SHAPES: Record<HandState, number> = { push: -1, free: 0, grip: 1 };
 
-/** Local points of the four fingers (inside the palm, knuckle, 3 joints) and the thumb. */
-function fingerPoints(shape: number): { fingers: Vector3[][]; thumb: Vector3[] } {
+/** True when a hand-local point would sink into the limb the hand holds. */
+type Inside = (local: Vector3) => boolean;
+/** Bisection steps when a finger joint or the thumb stops on the held limb. */
+const WRAP_STEPS = 8;
+/** Most a wrapping thumb bends at each joint, degrees (towards the palm side). */
+const THUMB_WRAP = [25, 50, 70] as const;
+
+/**
+ * Local points of the four fingers (inside the palm, knuckle, 3 joints) and the thumb. Closing
+ * on a held limb (`inside`), each finger joint curls only until it touches the surface, and a
+ * thumb the fist would sink wraps the limb instead: the hand holds a thigh as well as a sleeve.
+ */
+function fingerPoints(shape: number, inside?: Inside): { fingers: Vector3[][]; thumb: Vector3[] } {
   const [curlTo, thumbTo] = shape >= 0 ? [FIST_CURL, THUMB_FIST] : [FLAT_CURL, THUMB_FLAT];
   const amount = Math.abs(shape);
+  const wrap = shape > 0 ? inside : undefined;
   const palmSide = new Vector3(1, 0, 0);
   const fingers = FINGERS.map(([across, length, spread]) => {
     let d = new Vector3(0, 1, 0).applyAxisAngle(palmSide, -spread * DEG);
@@ -287,19 +299,77 @@ function fingerPoints(shape: number): { fingers: Vector3[][]; thumb: Vector3[] }
     const pts = [new Vector3(0, 7.0, across), pt];
     PHALANX.forEach((frac, k) => {
       const relaxed = FINGER_CURL[k] ?? 0;
-      const curl = relaxed + ((curlTo[k] ?? 0) - relaxed) * amount;
-      d = d.clone().applyAxisAngle(unit(d.clone().cross(palmSide)), curl * DEG);
+      const turn = (deg: number) =>
+        d.clone().applyAxisAngle(unit(d.clone().cross(palmSide)), deg * DEG);
+      const next = (deg: number) => pt.clone().add(turn(deg).multiplyScalar(length * frac));
+      let curl = relaxed + ((curlTo[k] ?? 0) - relaxed) * amount;
+      if (wrap?.(next(curl)) && !wrap(pt)) {
+        let [lo, hi] = [0, curl];
+        for (let i = 0; i < WRAP_STEPS; i++) {
+          const mid = (lo + hi) / 2;
+          if (wrap(next(mid))) hi = mid;
+          else lo = mid;
+        }
+        curl = lo;
+      }
+      d = turn(curl);
       pt = pt.clone().add(d.clone().multiplyScalar(length * frac));
       pts.push(pt);
     });
     return pts;
   });
   const thumb = THUMB.map((p, k) => v(p).lerp(v(thumbTo[k] ?? p), amount));
-  return { fingers, thumb };
+  const sinks = thumb.slice(1).some((p) => wrap?.(p) ?? false);
+  return { fingers, thumb: wrap && sinks && !wrap(thumb[0] as Vector3) ? wrapThumb(wrap) : thumb };
+}
+
+/**
+ * The thumb around a held limb too thick for the fist: from the relaxed thumb, each joint bends
+ * towards the palm side until it touches the surface, opposite the fingers.
+ */
+function wrapThumb(wrap: Inside): Vector3[] {
+  const palmSide = new Vector3(1, 0, 0);
+  let pt = v(THUMB[0] as Vec3);
+  const pts = [pt];
+  THUMB_WRAP.forEach((more, k) => {
+    const from = v(THUMB[k] as Vec3);
+    const to = v(THUMB[k + 1] as Vec3);
+    const base = to.clone().sub(from);
+    const length = base.length();
+    base.normalize();
+    const axis = unit(base.clone().cross(palmSide));
+    const next = (deg: number) =>
+      pt.clone().add(
+        base
+          .clone()
+          .applyAxisAngle(axis, deg * DEG)
+          .multiplyScalar(length),
+      );
+    let bend: number = more;
+    if (wrap(next(bend))) {
+      let lo = 0;
+      let hi = bend;
+      for (let i = 0; i < WRAP_STEPS; i++) {
+        const mid = (lo + hi) / 2;
+        if (wrap(next(mid))) hi = mid;
+        else lo = mid;
+      }
+      bend = lo;
+    }
+    pt = next(bend);
+    pts.push(pt);
+  });
+  return pts;
 }
 
 /** Finger and thumb bones of a hand bone, for a hand shape. */
-function handBones(hand: BoneFrame, s: 'L' | 'R', sign: number, shape: number): BoneFrames {
+function handBones(
+  hand: BoneFrame,
+  s: 'L' | 'R',
+  sign: number,
+  shape: number,
+  other?: CurrentFighterPose,
+): BoneFrames {
   const [x, y, z] = boneAxes(hand.head, hand.tail, hand.z);
   const at = (p: Vector3) =>
     hand.head
@@ -307,7 +377,11 @@ function handBones(hand: BoneFrame, s: 'L' | 'R', sign: number, shape: number): 
       .add(x.clone().multiplyScalar(p.x * sign))
       .add(y.clone().multiplyScalar(p.y))
       .add(z.clone().multiplyScalar(p.z));
-  const { fingers, thumb } = fingerPoints(shape);
+  const held = other ? heldLimb(at(PALM_CENTRE), other) : null;
+  const inside: Inside | undefined = held
+    ? (p) => capsuleGap(at(p), held) < WRAP_CLEAR_CM
+    : undefined;
+  const { fingers, thumb } = fingerPoints(shape, inside);
   const bones: BoneFrames = new Map();
   fingers.forEach((pts, i) => {
     for (let k = 0; k < 3; k++) {
@@ -332,28 +406,55 @@ function handBones(hand: BoneFrame, s: 'L' | 'R', sign: number, shape: number): 
 
 /** A hand point this close to the opponent's surface (cm) is closed, beyond `hi` relaxed. */
 const GRIP_CM = [3, 10] as const;
-/** The opponent's volume, as capsules: [joint, joint, radius cm]. */
-const GRIP_CAPSULES: ReadonlyArray<readonly [CurrentJoint, CurrentJoint, number]> = [
-  ['pelvis', 'neck', 14],
-  ['neck', 'head', 6],
-  ['head', 'head', 12],
+/** The opponent's volume, as tapered capsules: [joint, joint, radius at each, cm]. */
+const GRIP_CAPSULES: ReadonlyArray<readonly [CurrentJoint, CurrentJoint, number, number]> = [
+  ['pelvis', 'neck', 14, 14],
+  ['neck', 'head', 6, 6],
+  ['head', 'head', 12, 12],
   ...(['L', 'R'] as const).flatMap(
     (s) =>
       [
-        ['neck', `elbow${s}`, 5],
-        [`elbow${s}`, `hand${s}`, 4],
-        ['pelvis', `knee${s}`, 8],
-        [`knee${s}`, `foot${s}`, 5.5],
+        ['neck', `elbow${s}`, 5, 4.5],
+        [`elbow${s}`, `hand${s}`, 4.5, 3],
+        ['pelvis', `knee${s}`, 9, 6],
+        [`knee${s}`, `foot${s}`, 5.5, 4],
+        [`foot${s}`, `toe${s}`, 4, 2.5],
       ] as const,
   ),
 ];
 
-function pointSegmentDistance(p: Vector3, a: Vector3, b: Vector3): number {
+type Capsule = { a: Vector3; b: Vector3; ra: number; rb: number };
+
+/** Distance from p to a tapered capsule's surface (negative inside), cm. */
+function capsuleGap(p: Vector3, { a, b, ra, rb }: Capsule): number {
   const ab = b.clone().sub(a);
   const lengthSq = ab.lengthSq();
-  if (lengthSq < 1e-12) return p.distanceTo(a);
-  const t = Math.min(1, Math.max(0, p.clone().sub(a).dot(ab) / lengthSq));
-  return p.distanceTo(a.clone().add(ab.multiplyScalar(t)));
+  const t = lengthSq < 1e-12 ? 0 : Math.min(1, Math.max(0, p.clone().sub(a).dot(ab) / lengthSq));
+  return p.distanceTo(a.clone().add(ab.multiplyScalar(t))) - (ra + (rb - ra) * t);
+}
+
+const capsule = (other: CurrentFighterPose, [ja, jb, ra, rb]: (typeof GRIP_CAPSULES)[number]) => ({
+  a: v(other[ja]),
+  b: v(other[jb]),
+  ra,
+  rb,
+});
+
+/** Hand-local centre of the palm, where a grip holds. */
+const PALM_CENTRE = new Vector3(1.5, 5, 0);
+/** How far a finger's centre line stays off the held limb's surface, cm. */
+const WRAP_CLEAR_CM = 1;
+
+/** The opponent's capsule nearest the palm, if the palm is within grip range of it. */
+function heldLimb(palm: Vector3, other: CurrentFighterPose): Capsule | null {
+  let best: Capsule | null = null;
+  let bestGap: number = GRIP_CM[1];
+  for (const c of GRIP_CAPSULES) {
+    const held = capsule(other, c);
+    const gap = capsuleGap(palm, held);
+    if (gap < bestGap) [best, bestGap] = [held, gap];
+  }
+  return best;
 }
 
 const smoothstep = (t: number) => t * t * (3 - 2 * t);
@@ -367,9 +468,7 @@ export function gripAmount(
   const hand = v(f[`hand${s}`]);
   let gap = hand.distanceTo(v(f[s === 'L' ? 'handR' : 'handL'])) - 6;
   if (other) {
-    for (const [a, b, r] of GRIP_CAPSULES) {
-      gap = Math.min(gap, pointSegmentDistance(hand, v(other[a]), v(other[b])) - r);
-    }
+    for (const c of GRIP_CAPSULES) gap = Math.min(gap, capsuleGap(hand, capsule(other, c)));
   }
   const [lo, hi] = GRIP_CM;
   return smoothstep(Math.min(1, Math.max(0, (hi - gap) / (hi - lo))));
@@ -433,7 +532,7 @@ export function boneFrames(
       shape = prev.hand[s] + Math.max(-step, Math.min(step, shape - prev.hand[s]));
     }
     state.hand[s] = shape;
-    for (const [n, b] of handBones(bones.get(`hand.${s}`) as BoneFrame, s, sign, shape)) {
+    for (const [n, b] of handBones(bones.get(`hand.${s}`) as BoneFrame, s, sign, shape, other)) {
       bones.set(n, b);
     }
   }

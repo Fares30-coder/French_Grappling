@@ -390,12 +390,21 @@ THUMB_FLAT = [(0.9, 1.6, 1.6), (1.1, 3.8, 3.7), (1.2, 5.8, 5.1), (1.2, 7.6, 5.9)
 HAND_SHAPES = {'push': -1.0, 'free': 0.0, 'grip': 1.0}
 
 
-def _finger_points(shape):
+WRAP_STEPS = 8  # bisection steps when a finger joint or the thumb stops on the held limb
+THUMB_WRAP = (25, 50, 70)  # most a wrapping thumb bends at each joint, degrees (towards the palm)
+WRAP_CLEAR_CM = 1  # how far a finger's centre line stays off the held limb's surface
+PALM_CENTRE = (1.5, 5, 0)  # hand-local centre of the palm, where a grip holds
+
+
+def _finger_points(shape, inside=None):
     """Local points (palm side x, along y, thumb side z) of the four fingers and the thumb, for a
     hand shape from -1 (flat) through 0 (relaxed) to 1 (fist). Each finger: inside the palm,
-    knuckle, 3 joints."""
+    knuckle, 3 joints. Closing on a held limb (`inside`: local point -> sinks into it), each
+    finger joint curls only until it touches the surface, and a thumb the fist would sink wraps
+    the limb instead."""
     curl_to, thumb_to = (FIST_CURL, THUMB_FIST) if shape >= 0 else (FLAT_CURL, THUMB_FLAT)
     amount = abs(shape)
+    wrap = inside if shape > 0 else None
     palm_side = Vector((1, 0, 0))
     fingers = []
     for across, length, spread, _r in FINGERS:
@@ -403,19 +412,69 @@ def _finger_points(shape):
         pt = Vector((0, 9.2, across))
         pts = [Vector((0, 7.0, across)), pt]
         for frac, relaxed, end in zip(PHALANX, FINGER_CURL, curl_to):
-            d = _rotate(d, d.cross(palm_side).normalized(), relaxed + (end - relaxed) * amount)
+            def nxt(deg, d=d, pt=pt, step=length * frac):
+                return pt + _rotate(d, d.cross(palm_side).normalized(), deg) * step
+            curl = relaxed + (end - relaxed) * amount
+            if wrap and wrap(nxt(curl)) and not wrap(pt):
+                lo, hi = 0.0, curl
+                for _ in range(WRAP_STEPS):
+                    mid = (lo + hi) / 2
+                    if wrap(nxt(mid)):
+                        hi = mid
+                    else:
+                        lo = mid
+                curl = lo
+            d = _rotate(d, d.cross(palm_side).normalized(), curl)
             pt = pt + d * (length * frac)
             pts.append(pt)
         fingers.append(pts)
+
     thumb = [Vector(p).lerp(Vector(f), amount) for (p, _r), f in zip(THUMB, thumb_to)]
+    if wrap and any(wrap(p) for p in thumb[1:]) and not wrap(thumb[0]):
+        thumb = _wrap_thumb(wrap)
     return fingers, thumb
 
 
-def _hand_bones(head, tail, z, s, sign, shape):
-    """Finger and thumb bones (head, tail, z) in Tatamap cm, for a hand bone head -> tail."""
+def _wrap_thumb(wrap):
+    """The thumb around a held limb too thick for the fist: from the relaxed thumb, each joint
+    bends towards the palm side until it touches the surface, opposite the fingers."""
+    palm_side = Vector((1, 0, 0))
+    pt = Vector(THUMB[0][0])
+    pts = [pt]
+    for k, more in enumerate(THUMB_WRAP):
+        base = Vector(THUMB[k + 1][0]) - Vector(THUMB[k][0])
+        length = base.length
+        base = base.normalized()
+        axis = base.cross(palm_side).normalized()
+
+        def nxt(deg, pt=pt, base=base, axis=axis, length=length):
+            return pt + _rotate(base, axis, deg) * length
+        bend = more
+        if wrap(nxt(bend)):
+            lo, hi = 0.0, bend
+            for _ in range(WRAP_STEPS):
+                mid = (lo + hi) / 2
+                if wrap(nxt(mid)):
+                    hi = mid
+                else:
+                    lo = mid
+            bend = lo
+        pt = nxt(bend)
+        pts.append(pt)
+    return pts
+
+
+def _hand_bones(head, tail, z, s, sign, shape, other=None):
+    """Finger and thumb bones (head, tail, z) in Tatamap cm, for a hand bone head -> tail;
+    a closing hand wraps the opponent's limb nearest its palm (`other`: the opponent's joints)."""
     axes = _axes(head, tail, z)
     at = _local(head, axes, sign)
-    fingers, thumb = _finger_points(shape)
+    held = _held_limb(at(*PALM_CENTRE), other) if other else None
+    inside = None
+    if held:
+        def inside(p):
+            return _capsule_gap(at(*p), *held) < WRAP_CLEAR_CM
+    fingers, thumb = _finger_points(shape, inside)
     bones = {}
     for i, pts in enumerate(fingers):
         for k in range(3):
@@ -598,15 +657,30 @@ def build_humanoids():
 
 GRIP_CM = (3, 10)  # hand point to the opponent's surface: closed below, relaxed above
 GRIP_SPEED = 0.12  # most the hand shape changes per frame (about a quarter of a second to close)
-# The opponent's volume, as capsules: (joint, joint, radius cm).
-BODY_CAPSULES = [('pelvis', 'neck', 14), ('neck', 'head', 6), ('head', 'head', 12)] + [
-    c for s in 'LR' for c in (('neck', 'elbow' + s, 5), ('elbow' + s, 'hand' + s, 4),
-                              ('pelvis', 'knee' + s, 8), ('knee' + s, 'foot' + s, 5.5))]
+# The opponent's volume, as tapered capsules: (joint, joint, radius at each, cm).
+BODY_CAPSULES = [('pelvis', 'neck', 14, 14), ('neck', 'head', 6, 6), ('head', 'head', 12, 12)] + [
+    c for s in 'LR' for c in (('neck', 'elbow' + s, 5, 4.5), ('elbow' + s, 'hand' + s, 4.5, 3),
+                              ('pelvis', 'knee' + s, 9, 6), ('knee' + s, 'foot' + s, 5.5, 4),
+                              ('foot' + s, 'toe' + s, 4, 2.5))]
 
 
-def _segment_distance(p, a, b):
-    closest, t = intersect_point_line(p, a, b) if (b - a).length > 1e-6 else (a, 0.0)
-    return (p - (a if t < 0 else b if t > 1 else closest)).length
+def _capsule_gap(p, a, b, ra, rb):
+    """Distance from p to a tapered capsule's surface (negative inside), cm."""
+    ab = b - a
+    length_sq = ab.length_squared
+    t = 0.0 if length_sq < 1e-12 else min(1.0, max(0.0, (p - a).dot(ab) / length_sq))
+    return (p - (a + ab * t)).length - (ra + (rb - ra) * t)
+
+
+def _held_limb(palm, other):
+    """The opponent's capsule (a, b, ra, rb) nearest the palm, if the palm is within grip range."""
+    o = {k: _v(v) for k, v in other.items()}
+    best, best_gap = None, GRIP_CM[1]
+    for ja, jb, ra, rb in BODY_CAPSULES:
+        gap = _capsule_gap(palm, o[ja], o[jb], ra, rb)
+        if gap < best_gap:
+            best, best_gap = (o[ja], o[jb], ra, rb), gap
+    return best
 
 
 def grip_amount(f, s, other=None):
@@ -616,7 +690,7 @@ def grip_amount(f, s, other=None):
     gap = (hand - _v(f['hand' + ('R' if s == 'L' else 'L')])).length - 6
     if other:
         o = {k: _v(v) for k, v in other.items()}
-        gap = min([gap] + [_segment_distance(hand, o[a], o[b]) - r for a, b, r in BODY_CAPSULES])
+        gap = min([gap] + [_capsule_gap(hand, o[a], o[b], ra, rb) for a, b, ra, rb in BODY_CAPSULES])
     lo, hi = GRIP_CM
     return _smoothstep(min(1.0, max(0.0, (hi - gap) / (hi - lo))))
 
@@ -649,7 +723,7 @@ def bone_frames(f, prev=None, other=None, hands=None, thumbs=None):
             before = prev['hand'][s]
             shape = before + max(-GRIP_SPEED, min(GRIP_SPEED, shape - before))
         state['hand'][s] = shape
-        bones.update(_hand_bones(*bones['hand.' + s], s, sign, shape))
+        bones.update(_hand_bones(*bones['hand.' + s], s, sign, shape, other))
     return bones, state
 
 
