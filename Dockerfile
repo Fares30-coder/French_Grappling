@@ -77,5 +77,7 @@ CMD ["node", "dist/server.js"]
 FROM sources AS tools
 ENV NODE_ENV=development \
     npm_config_verify_deps_before_run=false
-RUN pnpm db:generate
+# `prisma generate` only reads the schema; the dummy URL lives for this step only,
+# so the image carries none (compose passes the real one at run time).
+RUN DATABASE_URL=postgresql://build:build@localhost:5432/build pnpm db:generate
 USER node
