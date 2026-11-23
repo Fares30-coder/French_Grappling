@@ -109,9 +109,17 @@ export function PublicLayout() {
             Hors ligne : vérifie ta connexion pour charger les techniques.
           </p>
         )}
-        <div id="contenu" className="flex-1 pb-28 md:pb-0">
+        <div id="contenu" className="flex-1">
           <Outlet />
         </div>
+        <footer className="flex flex-wrap gap-x-6 gap-y-2 border-t border-line px-4 py-5 pb-28 text-sm text-ink-muted md:px-16 md:pb-5">
+          <Link to="/mentions-legales" className={`rounded text-ink-muted ${focusRing}`}>
+            Mentions légales
+          </Link>
+          <Link to="/confidentialite" className={`rounded text-ink-muted ${focusRing}`}>
+            Confidentialité
+          </Link>
+        </footer>
       </div>
       <AdRail pathname={pathname} />
       <TabBar pathname={pathname} />
