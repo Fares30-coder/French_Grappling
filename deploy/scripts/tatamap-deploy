@@ -1,0 +1,25 @@
+#!/bin/bash
+# Forced command of the CI key (ADR 0005 D4). Installed once by hand as /usr/local/bin/tatamap-deploy
+# and bound in ~deploy/.ssh/authorized_keys:
+#   restrict,command="/usr/local/bin/tatamap-deploy" ssh-ed25519 AAAA... tatamap-ci
+# The only accepted input is a 40-hex-character commit SHA (SSH_ORIGINAL_COMMAND).
+set -euo pipefail
+
+APP_DIR=/opt/tatamap
+REPO_DIR="$APP_DIR/repo"
+REPO_URL="https://github.com/Fares30-coder/French_Grappling.git"
+
+sha="${SSH_ORIGINAL_COMMAND:-}"
+if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "tatamap-deploy: expected a 40-character commit SHA" >&2
+  exit 2
+fi
+
+# Public clone, no credentials: only the deploy/ folder of that commit is used.
+if [ ! -d "$REPO_DIR/.git" ]; then
+  git clone --quiet "$REPO_URL" "$REPO_DIR"
+fi
+git -C "$REPO_DIR" fetch --quiet origin
+git -C "$REPO_DIR" checkout --quiet --detach "$sha"
+
+exec "$REPO_DIR/deploy/scripts/deploy.sh" "$sha"
