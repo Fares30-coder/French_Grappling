@@ -1,10 +1,12 @@
 #!/bin/bash
 # Daily encrypted database backup (ADR 0005 D7). Run by a systemd timer at 03:30 as `deploy`.
-#   backup.sh              dump, encrypt, keep 7 local files, upload, prune remote, ping
+#   backup.sh              dump, encrypt, keep 7 local files, upload, ping
 #   backup.sh --local-only dump and encrypt only (used by deploy.sh before a migration)
 # The dump is encrypted with the PUBLIC age key: the server cannot read its own backups.
 # Config in /etc/tatamap/backup.env (chmod 600): AGE_RECIPIENT, RCLONE_REMOTE (e.g. "ovh:bucket/db"),
 # PING_URL; the S3 credentials are in /etc/tatamap/rclone.conf.
+# The server's S3 key can only WRITE (no delete, no overwrite of history): remote retention is a
+# lifecycle rule of the bucket, not something this script does (ADR 0005 D7, deploy/README.md).
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/tatamap}"
@@ -33,6 +35,5 @@ ls -1t "$BACKUP_DIR"/tatamap-*.dump.age | tail -n +8 | xargs -r rm -f
 [ "$local_only" = 1 ] && { echo "local backup: $file"; exit 0; }
 
 rclone copy "$file" "$RCLONE_REMOTE"
-rclone delete --min-age 35d "$RCLONE_REMOTE"
 curl -fsS --max-time 10 "$PING_URL" >/dev/null
 echo "backup done: $file"
