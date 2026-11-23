@@ -6,6 +6,8 @@
 export const ADSENSE_CLIENT = import.meta.env.VITE_ADSENSE_CLIENT;
 export const ADSENSE_SLOT_RAIL = import.meta.env.VITE_ADSENSE_SLOT_RAIL;
 
+import { isAdminPath } from '../../lib/admin-isolation';
+
 declare global {
   interface Window {
     adsbygoogle?: unknown[];
@@ -16,7 +18,7 @@ let scriptAdded = false;
 
 /** Adds the AdSense script once, on the first ad shown (never on admin pages). */
 export function loadAdSense(client: string): void {
-  if (scriptAdded) return;
+  if (scriptAdded || isAdminPath(window.location.pathname)) return;
   scriptAdded = true;
   const script = document.createElement('script');
   script.async = true;

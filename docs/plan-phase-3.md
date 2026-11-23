@@ -80,10 +80,10 @@ Fait (PR #14) puis retiré : une app mobile équivalente prendra le hors ligne e
 
 ### Lot 8 — Mise en ligne
 
-- Contrainte : même origine pour le front et l'API (ADR 0003 B6), donc soit un seul hébergeur pour les deux, soit une réécriture `/api/*` du front vers l'API. **Décision à prendre avec l'architecte** (ADR 0005) : Render ou Railway pour API + base, front sur le même service ou derrière Vercel / Netlify avec réécriture.
+- Contrainte : même origine pour le front et l'API (ADR 0003 B6), donc soit un seul hébergeur pour les deux, soit une réécriture `/api/*` du front vers l'API. **Décidé (ADR 0005)** : VPS OVH, Caddy sert le front et relaie `/api/*` vers l'API.
 - Base PostgreSQL de prod, migrations en CI au déploiement, `pnpm admin:create` en prod, `content:import` depuis le repo privé.
 - En-têtes : CSP stricte, HSTS, `COOKIE_SECURE=true` obligatoire.
-- Pages légales : mentions légales (obligatoires pour un site édité par une micro-entreprise), politique de confidentialité. Pas de traceur, donc pas de bandeau cookies.
+- Pages légales : mentions légales (obligatoires pour un site édité par une micro-entreprise), politique de confidentialité qui mentionne AdSense. Consentement RGPD par le CMP de Google (bandeau géré par Google, configuré dans le compte AdSense). AdSense présent au lancement (ADR 0005 D3, CSP à nonce) ; demande de validation envoyée dès que le site est ouvert.
 - Audit cybersécurité avant d'ouvrir l'adresse.
 - Critère : `https://tatamap.fr` sert le site, l'admin fonctionne en prod, l'audit ne relève rien de bloquant.
 
@@ -95,6 +95,6 @@ Fait (PR #14) puis retiré : une app mobile équivalente prendra le hors ligne e
 
 ## Décisions ouvertes
 
-1. Hébergement et même origine (lot 8, ADR 0005).
+1. Hébergement et même origine : décidé, ADR 0005.
 2. Adresse de contact affichée : aujourd'hui l'adresse personnelle de Fares dans la maquette ; à remplacer par une adresse sur `tatamap.fr` dès que le domaine est pris.
 3. Correction des membres qui frôlent l'adversaire dans certaines transitions (contenu) : à traiter avant les clubs ou après, selon les retours.

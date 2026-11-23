@@ -1,0 +1,56 @@
+# Tatamap production Caddyfile (ADR 0005 D1-D3). Environment: see .env.example.
+# Local trial: SITE_DOMAIN=localhost (Caddy then uses its own local CA).
+{
+	email {$ACME_EMAIL}
+}
+
+# Static front, shared by the admin and public handlers below.
+(static) {
+	header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+	@hashed path /assets/*
+	header @hashed Cache-Control "public, max-age=31536000, immutable"
+	@other not path /assets/*
+	header @other Cache-Control "no-cache"
+	root * /srv
+	try_files {path} /index.html
+	# The build leaves a template action as nonce in index.html; this turns it into the
+	# request uuid, the same value as in the CSP header (profile adsense).
+	templates {
+		mime text/html
+	}
+	file_server
+}
+
+www.{$SITE_DOMAIN} {
+	redir https://{$SITE_DOMAIN}{uri} permanent
+}
+
+{$SITE_DOMAIN} {
+	encode zstd gzip
+	# `on` puts a basic_auth over the whole site until the security audit is done.
+	import prelaunch-{$PRELAUNCH:on}.caddy
+
+	header {
+		>Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	# The API sets its own CSP (default-src 'none') and Cache-Control.
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+
+	# The admin never gets the Google origins, whatever the profile: a third-party script must not
+	# share a document with the admin session (the front also reloads fully when entering /admin).
+	handle /admin* {
+		import csp-strict.caddy
+		import static
+	}
+
+	handle {
+		import csp-{$CSP_PROFILE:adsense}.caddy
+		import static
+	}
+}

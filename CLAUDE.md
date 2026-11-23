@@ -27,14 +27,14 @@ Documents de référence :
 | ORM / base | Prisma + PostgreSQL (poses en JSONB) |
 | Validation | Zod, schémas partagés front/back |
 | Auth | Un seul compte admin créé par `pnpm admin:create` (argon2id) ; JWT HS256 de 2 h (renouvelé à l'usage) en cookie `HttpOnly; Secure; SameSite=Strict` ; contrôle d'`Origin` sur les requêtes d'écriture (ADR 0003) |
-| Hébergement | Front Vercel ou Netlify, API + base Render ou Railway |
+| Hébergement | VPS OVH en France : Docker Compose (Caddy + API + PostgreSQL 17), même origine `https://tatamap.fr`, déploiement par GitHub Actions (SSH, commande forcée), sauvegardes chiffrées sur OVH Object Storage (ADR 0005) |
 | CI | GitHub Actions |
 | Outillage | pnpm 12 (workspaces + catalogue), Node 24 LTS, TypeScript 6 strict, Biome (lint + format), Vitest |
 | Base locale | PostgreSQL 17 via docker-compose |
 
 Structure prévue (monorepo) : `apps/web`, `apps/api`, `packages/shared`, `docker-compose.yml` (PostgreSQL local).
 
-Décisions détaillées : `docs/adr/` (0001 outillage, 0002 modèle de données et format de pose, 0003 admin, API d'écriture et éditeur, 0004 évolution du rendu 3D). Plans : `docs/plan-phase-1.md`, `docs/plan-phase-2.md`.
+Décisions détaillées : `docs/adr/` (0001 outillage, 0002 modèle de données et format de pose, 0003 admin, API d'écriture et éditeur, 0004 évolution du rendu 3D, 0005 hébergement). Plans : `docs/plan-phase-1.md`, `docs/plan-phase-2.md`.
 
 ## Modèle de données
 
