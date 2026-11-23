@@ -1,6 +1,6 @@
 # Plan phase 3 — Test en club
 
-Objectif de la phase (CLAUDE.md) : **« un prof prêt à payer »**. Pour y arriver : un site public présentable (accueil, bibliothèque, page technique, carte des positions), utilisable au club sans réseau, en ligne sur une vraie adresse, et montré à 2 ou 3 clubs testeurs.
+Objectif de la phase (CLAUDE.md) : **« un prof prêt à payer »**. Pour y arriver : un site public présentable (accueil, bibliothèque, page technique, carte des positions), en ligne sur une vraie adresse, et montré à 2 ou 3 clubs testeurs.
 
 Références :
 - Maquette validée (ordinateur et téléphone) : https://claude.ai/artifact/MKkfmuymMEHigTRvWuraid. Elle fait foi pour la mise en page, les couleurs et les textes.
@@ -68,7 +68,10 @@ Routes prévues dans CLAUDE.md, techniques **publiées** seulement, schémas Zod
 - Repli lisible si le graphe grandit au-delà de ~10 positions : à réévaluer plus tard (lib de layout), pas maintenant.
 - Critère : depuis la carte, on atteint chaque technique en deux clics.
 
-### Lot 7 — Hors ligne (PWA)
+### Lot 7 — Hors ligne (PWA) — retiré le 2026-11-23
+
+Fait (PR #14) puis retiré : une app mobile équivalente prendra le hors ligne en charge. Il reste un bandeau quand le navigateur est hors ligne. Plan d'origine :
+
 
 - `vite-plugin-pwa` : manifeste (nom, icônes, couleur `#0F1A1F`), précache de l'appli, cache « réseau d'abord » des routes publiques de l'API, exclusion stricte de `/api/admin/*` et `/api/auth/*` (ADR 0003).
 - Bouton « Disponible hors ligne » qui télécharge toutes les techniques publiées (15 fiches, quelques centaines de Ko).

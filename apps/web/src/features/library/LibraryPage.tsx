@@ -11,7 +11,6 @@ import { useSearchParams } from 'react-router';
 import { buttonClass } from '../../ui/button';
 import { Chip } from '../../ui/Chip';
 import { PageHeader } from '../../ui/text';
-import { OfflineCard } from '../offline/OfflineCard';
 import { type FilterKey, hasFilters, readFilters, withFilter } from './filters';
 import { TechniqueCard } from './TechniqueCard';
 import { usePositions, useTechniqueList } from './use-catalog';
@@ -156,8 +155,6 @@ export function LibraryPage() {
             </dl>
           )}
         </div>
-
-        <OfflineCard />
 
         <section aria-label="Recherche et filtres" className="flex flex-col gap-4">
           <label htmlFor={searchId} className="text-[15px] font-medium">

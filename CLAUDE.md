@@ -9,7 +9,7 @@ Documents de référence :
 ## Décisions prises
 
 - **Nom : Tatamap** (tatami + map). Concurrent au nom proche à surveiller : Tatamy (tatamy.app, journal d'entraînement arts martiaux). À faire : réserver tatamap.fr / .com, @tatamap sur Instagram et TikTok, dépôt INPI plus tard.
-- **Site web d'abord (PWA)**, pas d'app mobile native au départ : la 3D web (Three.js) est mature, ça colle au stack React/Node, pas de stores, l'éditeur de poses est plus confortable sur ordinateur.
+- **Site web d'abord**, pas d'app mobile native au départ : la 3D web (Three.js) est mature, ça colle au stack React/Node, pas de stores, l'éditeur de poses est plus confortable sur ordinateur. La PWA (hors ligne) a été retirée le 2026-11-23 : une app mobile équivalente prendra le hors ligne en charge.
 - **Différenciation** face au marché (Grapplearts, BJJ Fanatics, GrappleKit, BJJ OS, Your BJJ, Tatami…, presque tous en anglais) : le français, la 3D orientable, la carte des positions (graphe).
 - **Animations** : pas de vidéo générée par IA (rendu faux sur le grappling). Chaque technique = une suite de poses (articulations des 2 combattants), interpolées. Le contenu est créé via un **éditeur de poses admin**.
 - **Rendu 3D** (ADR 0004) : on garde Three.js / R3F. Étape 1 faite : le mannequin Blender des vidéos, exporté en glTF (`fighter.v3.glb` : corps réaliste MakeHuman/MPFB en CC0, addendum 2026-11-09), piloté par les articulations (`features/viewer/rig.ts`, testé contre Blender). Étape 2 faite : squelette `v2-21` (épaules, hanches, buste, mains, pieds, nez en données), contenu converti par `upgradePose`. Changer de moteur ne réécrirait que le viewer et les enfants 3D de l'éditeur.
@@ -23,7 +23,6 @@ Documents de référence :
 | Front | React + Vite + TypeScript, Tailwind CSS |
 | 3D | React Three Fiber + drei (OrbitControls) |
 | Données front | React Router + TanStack Query |
-| PWA | vite-plugin-pwa (hors ligne au club) |
 | Back | Node 24 + Fastify 5 + TypeScript (build tsdown, dev tsx) |
 | ORM / base | Prisma + PostgreSQL (poses en JSONB) |
 | Validation | Zod, schémas partagés front/back |
@@ -130,7 +129,7 @@ Le viewer 3D est **un seul composant réutilisé** (page technique, vignettes au
 
 1. **Socle** : repo, CI, Prisma, API en lecture, viewer 3D sur un JSON → critère : *le ciseau s'anime en lisant l'API*
 2. **Contenu** : éditeur de poses, connexion admin, 15 à 20 techniques → critère : *15 techniques publiées*
-3. **Test en club** : PWA hors ligne, carte des positions, 2 ou 3 clubs testeurs → critère : *un prof prêt à payer*
+3. **Test en club** : carte des positions, mise en ligne (ADR 0005), 2 ou 3 clubs testeurs → critère : *un prof prêt à payer*
 4. **Revenus** : espace club, abonnements Stripe, dépôt de marque INPI
 
 ## Prochaines étapes immédiates (phase 1)

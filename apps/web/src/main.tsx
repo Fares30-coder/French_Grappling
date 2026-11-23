@@ -5,10 +5,8 @@ import { RouterProvider } from 'react-router/dom';
 import './index.css';
 import { router } from './router';
 
-// offlineFirst: requests still go out when the device is offline, so the service worker's cache
-// can answer them (the default 'online' mode would pause them forever).
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: 60_000, networkMode: 'offlineFirst' } },
+  defaultOptions: { queries: { staleTime: 60_000 } },
 });
 
 const root = document.getElementById('root');

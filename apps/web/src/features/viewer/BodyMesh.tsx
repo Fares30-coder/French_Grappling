@@ -19,7 +19,7 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 import { applyDualQuaternionSkinning, createBoneTexture, writeBone } from './dq-skinning';
 import { type BoneFrame, boneAxes, boneFrames, type RigState } from './rig';
 
-/** The humanoid model (tools/blender/export_site_model.py), versioned so the PWA cache moves on. */
+/** The humanoid model (tools/blender/export_site_model.py), versioned so browser caches move on. */
 export const BODY_MODEL_URL = '/models/fighter.v3.glb';
 
 /** What else a body needs to pose its hands: the opponent (automatic grips) and the step's hands. */
