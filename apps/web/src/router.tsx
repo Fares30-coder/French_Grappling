@@ -4,7 +4,10 @@ import { PublicLayout } from './features/layout/PublicLayout';
 import { LibraryPage } from './features/library/LibraryPage';
 import { MapPage } from './features/map/MapPage';
 import { TechniquePage } from './features/techniques/TechniquePage';
+import { isolateAdmin } from './lib/admin-isolation';
 import { NotFoundPage, RouteErrorPage } from './pages/errors';
+import { LegalNoticePage } from './pages/legal-notice';
+import { PrivacyPage } from './pages/privacy';
 
 // Keyed by slug so TechniquePage local state (current step...) resets when the technique changes.
 function KeyedTechniquePage() {
@@ -39,6 +42,8 @@ export const router = createBrowserRouter([
           { path: 'bibliotheque', element: <LibraryPage /> },
           { path: 'techniques/:slug', element: <KeyedTechniquePage /> },
           { path: 'carte', element: <MapPage /> },
+          { path: 'mentions-legales', element: <LegalNoticePage /> },
+          { path: 'confidentialite', element: <PrivacyPage /> },
           { path: '*', element: <NotFoundPage /> },
         ],
       },
@@ -80,3 +85,12 @@ export const router = createBrowserRouter([
     ],
   },
 ]);
+
+// Entering /admin from a public page is a full page load: the AdSense script never shares a
+// document with the admin (lib/admin-isolation.ts).
+isolateAdmin(
+  router,
+  (url) => window.location.assign(url),
+  window.location.pathname,
+  window.location.origin,
+);

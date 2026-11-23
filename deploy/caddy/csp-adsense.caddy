@@ -1,0 +1,5 @@
+# Strict nonce-based CSP, the one Google supports for AdSense. The nonce is the request uuid:
+# index.html carries the same value through the `templates` directive.
+# 'strict-dynamic' lets our trusted scripts load the AdSense script and the lazy 3D chunks; https:
+# and 'unsafe-inline' are fallbacks for old browsers and are ignored where 'strict-dynamic' works.
+header {$CSP_HEADER:Content-Security-Policy} "script-src 'nonce-{http.request.uuid}' 'strict-dynamic' https: 'unsafe-inline'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"

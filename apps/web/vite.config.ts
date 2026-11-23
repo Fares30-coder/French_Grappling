@@ -25,9 +25,15 @@ function adsTxt(): Plugin {
   };
 }
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [react(), tailwindcss(), adsTxt()],
+  // Build only: the generated <script>/<link> tags carry a Caddy template action that Caddy's
+  // `templates` directive turns into the per-request nonce of the CSP header (ADR 0005 D3, profile
+  // adsense). Backticks, not quotes: the value sits inside an HTML attribute.
+  html: command === 'build' ? { cspNonce: '{{placeholder `http.request.uuid`}}' } : {},
   build: {
+    // Small assets (the woff2 subsets) stay files: a data: font would need `data:` in font-src.
+    assetsInlineLimit: 0,
     // The 3D chunk (three.js, ~940 kB) is lazy-loaded by the pages that show 3D; the entry
     // stays ~250 kB. Warn only above that known size.
     chunkSizeWarningLimit: 1000,
@@ -38,4 +44,4 @@ export default defineConfig({
   },
   // `vite preview` serves the production build with the same proxy.
   preview: { proxy: apiProxy },
-});
+}));
