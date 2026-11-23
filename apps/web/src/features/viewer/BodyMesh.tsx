@@ -150,7 +150,9 @@ function buildBody(scene: Object3D, rest: Rest, color: string, translucent: bool
 }
 
 export function BodyMesh({ fighter, ref, translucent = false, initialPose, onReady }: Props) {
-  const gltf = useGLTF(BODY_MODEL_URL, false); // no Draco: its decoder comes from a CDN
+  // No Draco (its decoder comes from a CDN) and no meshopt (WebAssembly, which a strict CSP blocks):
+  // the model uses neither.
+  const gltf = useGLTF(BODY_MODEL_URL, false, false);
   const rest = gltf.scene.userData.tatamapRest as Rest | undefined;
   if (!rest) throw new Error(`${BODY_MODEL_URL}: no rest frames (tatamapRest)`);
   const body = useMemo(
@@ -214,4 +216,4 @@ export function BodyMesh({ fighter, ref, translucent = false, initialPose, onRea
   return <primitive object={body.root} />;
 }
 
-useGLTF.preload(BODY_MODEL_URL, false);
+useGLTF.preload(BODY_MODEL_URL, false, false);

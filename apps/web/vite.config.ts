@@ -32,6 +32,8 @@ export default defineConfig(({ command }) => ({
   // adsense). Backticks, not quotes: the value sits inside an HTML attribute.
   html: command === 'build' ? { cspNonce: '{{placeholder `http.request.uuid`}}' } : {},
   build: {
+    // Small assets (the woff2 subsets) stay files: a data: font would need `data:` in font-src.
+    assetsInlineLimit: 0,
     // The 3D chunk (three.js, ~940 kB) is lazy-loaded by the pages that show 3D; the entry
     // stays ~250 kB. Warn only above that known size.
     chunkSizeWarningLimit: 1000,
