@@ -1,7 +1,7 @@
 import { Link, Outlet, ScrollRestoration, useLocation } from 'react-router';
+import { useOnline } from '../../lib/use-online';
 import { LogoMark } from '../../ui/Logo';
 import { AdRail } from '../ads/AdRail';
-import { useOnline } from '../offline/use-online';
 import { isActive, NAV_ITEMS } from './nav';
 
 const focusRing =
@@ -106,7 +106,7 @@ export function PublicLayout() {
             role="status"
             className="m-0 border-b border-line bg-accent-tint px-4 py-2.5 text-center text-sm text-ink"
           >
-            Hors ligne : tu consultes les techniques enregistrées sur cet appareil.
+            Hors ligne : vérifie ta connexion pour charger les techniques.
           </p>
         )}
         <div id="contenu" className="flex-1 pb-28 md:pb-0">

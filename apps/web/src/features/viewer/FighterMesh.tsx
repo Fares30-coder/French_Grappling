@@ -128,7 +128,7 @@ export function FighterMesh({
   );
 }
 
-/** Falls back to the sticks when the model cannot load (offline before caching, bad file). */
+/** Falls back to the sticks when the model cannot load (offline, bad file). */
 class BodyErrorBoundary extends Component<
   { onError: () => void; children: ReactNode },
   { failed: boolean }

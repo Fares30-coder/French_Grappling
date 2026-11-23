@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CONTACT_EMAIL } from '../../config';
-import { useOnline } from '../offline/use-online';
+import { useOnline } from '../../lib/use-online';
 import { ADSENSE_CLIENT, ADSENSE_SLOT_RAIL, loadAdSense, requestAd } from './adsense';
 import { activeSponsors, SPONSORS, type Sponsor } from './sponsors';
 
