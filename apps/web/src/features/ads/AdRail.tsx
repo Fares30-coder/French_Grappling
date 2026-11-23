@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CONTACT_EMAIL } from '../../config';
+import { isAdminPath } from '../../lib/admin-isolation';
 import { useOnline } from '../../lib/use-online';
 import { ADSENSE_CLIENT, ADSENSE_SLOT_RAIL, loadAdSense, requestAd } from './adsense';
 import { activeSponsors, SPONSORS, type Sponsor } from './sponsors';
@@ -66,7 +67,7 @@ function AdSlot() {
     return active[Math.floor(Math.random() * active.length)];
   });
   if (sponsor) return <SponsorAd sponsor={sponsor} />;
-  if (online && ADSENSE_CLIENT && ADSENSE_SLOT_RAIL) {
+  if (online && !isAdminPath(window.location.pathname) && ADSENSE_CLIENT && ADSENSE_SLOT_RAIL) {
     return <AdSenseAd client={ADSENSE_CLIENT} slot={ADSENSE_SLOT_RAIL} />;
   }
   return <BecomeSponsor />;
