@@ -199,12 +199,6 @@ export function HomePage() {
 
       <footer className="flex flex-wrap justify-between gap-3 border-t border-line pt-5 text-[13px] text-ink-faint">
         <span>© {new Date().getFullYear()} Tatamap · Créé par Fares Haouari</span>
-        {/* Dev only: the admin has no public entry point. */}
-        {import.meta.env.DEV && (
-          <Link className="text-ink-faint underline" to="/admin">
-            Admin
-          </Link>
-        )}
       </footer>
     </main>
   );
