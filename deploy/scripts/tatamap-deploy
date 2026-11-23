@@ -2,24 +2,33 @@
 # Forced command of the CI key (ADR 0005 D4). Installed once by hand as /usr/local/bin/tatamap-deploy
 # and bound in ~deploy/.ssh/authorized_keys:
 #   restrict,command="/usr/local/bin/tatamap-deploy" ssh-ed25519 AAAA... tatamap-ci
-# The only accepted input is a 40-hex-character commit SHA (SSH_ORIGINAL_COMMAND).
+# Accepted input (SSH_ORIGINAL_COMMAND), nothing else:
+#   "<40-hex sha> sha256:<64 hex> sha256:<64 hex> sha256:<64 hex>"   deploy: digests of web, api, tools
+#   "<40-hex sha>"                                                   rollback to a version already
+#                                                                    deployed here (digests from releases.log)
+# The commit must be an ancestor of origin/main: deploy.sh of that commit runs as `deploy` (docker group).
 set -euo pipefail
 
 APP_DIR=/opt/tatamap
 REPO_DIR="$APP_DIR/repo"
 REPO_URL="https://github.com/Fares30-coder/French_Grappling.git"
 
-sha="${SSH_ORIGINAL_COMMAND:-}"
-if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
-  echo "tatamap-deploy: expected a 40-character commit SHA" >&2
+input="${SSH_ORIGINAL_COMMAND:-}"
+digest='sha256:[0-9a-f]{64}'
+if [[ ! "$input" =~ ^[0-9a-f]{40}(\ $digest\ $digest\ $digest)?$ ]]; then
+  echo "tatamap-deploy: expected '<sha>' or '<sha> <web> <api> <tools digests>'" >&2
   exit 2
 fi
+read -r sha web_digest api_digest tools_digest <<<"$input"
 
 # Public clone, no credentials: only the deploy/ folder of that commit is used.
 if [ ! -d "$REPO_DIR/.git" ]; then
   git clone --quiet "$REPO_URL" "$REPO_DIR"
 fi
 git -C "$REPO_DIR" fetch --quiet origin
+# Only commits of main may run: a pushed branch or tag must not reach docker as `deploy`.
+git -C "$REPO_DIR" merge-base --is-ancestor "$sha" origin/main \
+  || { echo "tatamap-deploy: $sha is not a commit of main" >&2; exit 3; }
 git -C "$REPO_DIR" checkout --quiet --detach "$sha"
 
-exec "$REPO_DIR/deploy/scripts/deploy.sh" "$sha"
+exec "$REPO_DIR/deploy/scripts/deploy.sh" "$sha" ${web_digest:+"$web_digest" "$api_digest" "$tools_digest"}

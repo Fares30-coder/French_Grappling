@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       sha:
-        description: Full SHA of a commit of main whose images already exist
+        description: Full SHA of a commit of main that was already deployed (rollback)
         required: true
 
 concurrency:
@@ -58,7 +58,8 @@ jobs:
       - run: pnpm build
 
   # The images must never contain private content (content/ is another repo, ADR 0005 D2): a decoy
-  # file is planted where content/ would be, and must be absent from every image.
+  # file is planted where content/ would be (and env files where secrets would be), and must be absent
+  # from every image.
   docker:
     if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -73,12 +74,14 @@ jobs:
           mkdir -p content/techniques
           echo '{}' > content/techniques/TATAMAP-CONTENT-DECOY.json
           echo '{}' > content/positions.json
+          echo 'DECOY=TATAMAP-ENV-DECOY' > apps/api/.env
+          echo 'DECOY=TATAMAP-ENV-DECOY' > local.env
       - name: Build the three images and look for the decoy
         run: |
           for target in web api tools; do
             docker buildx build --target "$target" --load -t "check-$target" .
             if docker run --rm --entrypoint sh "check-$target" -c \
-              'find / -xdev 2>/dev/null \( -name TATAMAP-CONTENT-DECOY.json -o -path "*/content/positions.json" \) | grep .'; then
+              'find / -xdev 2>/dev/null \( -name TATAMAP-CONTENT-DECOY.json -o -path "*/content/positions.json" -o -name local.env -o -path "*/apps/api/.env" \) | grep .'; then
               echo "::error::content/ leaked into the $target image"; exit 1
             fi
           done
@@ -91,6 +94,11 @@ jobs:
     permissions:
       contents: read
       packages: write
+    # Content digests of what was just pushed: production pulls by digest, never by tag.
+    outputs:
+      web_digest: ${{ steps.web.outputs.digest }}
+      api_digest: ${{ steps.api.outputs.digest }}
+      tools_digest: ${{ steps.tools.outputs.digest }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -103,7 +111,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Image owner in lower case
         run: echo "OWNER=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
-      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+      - id: web
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           target: web
@@ -119,13 +128,15 @@ jobs:
             VITE_LEGAL_ADDRESS=${{ vars.VITE_LEGAL_ADDRESS }}
             VITE_LEGAL_EMAIL=${{ vars.VITE_LEGAL_EMAIL }}
             VITE_LEGAL_DIRECTOR=${{ vars.VITE_LEGAL_DIRECTOR }}
-      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+      - id: api
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           target: api
           push: true
           tags: ghcr.io/${{ env.OWNER }}/tatamap-api:${{ github.sha }}
-      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+      - id: tools
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           target: tools
@@ -144,13 +155,33 @@ jobs:
       group: deploy-production
       cancel-in-progress: false
     steps:
-      - name: Pick the SHA
+      # Full history: the SHA must be an ancestor of origin/main before anything is sent to the VPS
+      # (the forced command checks it again on the server).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Pick the SHA and the image digests
         env:
           INPUT_SHA: ${{ inputs.sha }}
+          WEB_DIGEST: ${{ needs.images.outputs.web_digest }}
+          API_DIGEST: ${{ needs.images.outputs.api_digest }}
+          TOOLS_DIGEST: ${{ needs.images.outputs.tools_digest }}
         run: |
           sha="${INPUT_SHA:-$GITHUB_SHA}"
           [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::not a full SHA"; exit 1; }
-          echo "SHA=$sha" >> "$GITHUB_ENV"
+          git fetch --quiet origin main
+          git merge-base --is-ancestor "$sha" origin/main \
+            || { echo "::error::$sha is not a commit of main"; exit 1; }
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            # Rollback: the server looks the digests up in the history of its own deployments.
+            echo "COMMAND=$sha" >> "$GITHUB_ENV"
+          else
+            for d in "$WEB_DIGEST" "$API_DIGEST" "$TOOLS_DIGEST"; do
+              [[ "$d" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::missing image digest"; exit 1; }
+            done
+            echo "COMMAND=$sha $WEB_DIGEST $API_DIGEST $TOOLS_DIGEST" >> "$GITHUB_ENV"
+          fi
       - name: Deploy over SSH
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
@@ -161,4 +192,4 @@ jobs:
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
-            "deploy@$DEPLOY_HOST" "$SHA"
+            "deploy@$DEPLOY_HOST" "$COMMAND"
