@@ -3,6 +3,8 @@ dist
 .env
 .env.*
 !.env.example
+# Local trial of the production stack (deploy/README.md): holds throwaway secrets
+local.env
 **/src/generated
 coverage
 *.tsbuildinfo

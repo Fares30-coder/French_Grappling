@@ -1,8 +1,9 @@
 # Never part of an image: private content, secrets, VCS, heavy tooling and build output.
 content/
-.env
-.env.*
-!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+local.env
 .git
 .github
 **/node_modules
