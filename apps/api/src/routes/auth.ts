@@ -11,6 +11,23 @@ import type { PrismaClient } from '../generated/prisma/client';
 const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_WINDOW = '15 minutes';
 
+/** Rate-limit key: an IPv6 client can rotate through its whole /64, so group by that prefix. */
+export function loginRateLimitKey(ip: string): string {
+  if (!ip.includes(':') || ip.startsWith('::ffff:')) return ip;
+  const [head = ''] = ip.split('%');
+  const [left = '', right] = head.split('::');
+  const l = left ? left.split(':') : [];
+  const r = right ? right.split(':') : [];
+  const groups =
+    right === undefined
+      ? l
+      : [...l, ...Array(Math.max(0, 8 - l.length - r.length)).fill('0'), ...r];
+  return `${groups
+    .slice(0, 4)
+    .map((g) => g.toLowerCase().replace(/^0+(?=.)/, ''))
+    .join(':')}::/64`;
+}
+
 export function registerAuthRoutes(
   app: FastifyInstance,
   { prisma, config }: { prisma: PrismaClient; config: AppConfig },
@@ -18,7 +35,15 @@ export function registerAuthRoutes(
   const accountLimiter = createLoginLimiter();
   app.post(
     '/api/auth/login',
-    { config: { rateLimit: { max: LOGIN_MAX_ATTEMPTS, timeWindow: LOGIN_WINDOW } } },
+    {
+      config: {
+        rateLimit: {
+          max: LOGIN_MAX_ATTEMPTS,
+          timeWindow: LOGIN_WINDOW,
+          keyGenerator: (request) => loginRateLimitKey(request.ip),
+        },
+      },
+    },
     async (request, reply) => {
       reply.header('Cache-Control', 'no-store');
       // safeParse, and the body is never logged: a mistyped field may be the password.
@@ -36,14 +61,14 @@ export function registerAuthRoutes(
         device.email === admin.email.toLowerCase();
 
       // Same answer as the per-IP limit, whether or not the account exists.
-      if (!trusted && accountLimiter.isBlocked(input.data.email)) {
+      if (!trusted && accountLimiter.isBlocked(input.data.email, admin !== null)) {
         return sendApiError(reply, 429, 'rate_limited', 'Invalid request');
       }
 
       // Verified against a dummy hash when the email is unknown: same cost, same answer.
       const ok = await verifyPassword(admin?.passwordHash ?? null, input.data.password);
       if (!admin || !ok) {
-        if (!trusted) accountLimiter.recordFailure(input.data.email);
+        if (!trusted) accountLimiter.recordFailure(input.data.email, admin !== null);
         return sendApiError(reply, 401, 'unauthorized', 'Invalid credentials');
       }
       accountLimiter.reset(input.data.email);
