@@ -43,9 +43,9 @@ export async function buildApp({ prisma, config, logStream }: AppDeps): Promise<
       useDefaults: false,
       directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] },
     },
-    // HSTS keeps helmet's defaults: max-age of one year (31536000 s) with includeSubDomains.
-    // TODO(phase 3): review includeSubDomains (and preload) at deployment, once we know which
-    // subdomains share the registered domain.
+    // HSTS: one year with includeSubDomains, the same value Caddy sets in production (ADR 0005 D3;
+    // only www exists and it redirects). No preload for now.
+    strictTransportSecurity: { maxAge: 31536000, includeSubDomains: true },
     crossOriginResourcePolicy: { policy: 'same-site' },
   });
   registerOriginCheck(app, config.webOrigins);
