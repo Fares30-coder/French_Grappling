@@ -34,11 +34,11 @@ export function LegalNoticePage() {
       <section className={legalSectionClass}>
         <h2 className={legalH2Class}>Hébergeur</h2>
         <p className="m-0">
-          Le site est hébergé en France par {HOST.name}, {HOST.address} (
+          Le site est hébergé par {HOST.name}, {HOST.address} (
           <a href={HOST.website} rel="noreferrer noopener">
-            ovhcloud.com
+            cloudflare.com
           </a>
-          ).
+          ). Il est servi depuis le réseau mondial de l'hébergeur, au plus près du visiteur.
         </p>
       </section>
       <section className={legalSectionClass}>

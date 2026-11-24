@@ -18,11 +18,11 @@ export const LEGAL = {
   director: read(import.meta.env.VITE_LEGAL_DIRECTOR),
 } as const;
 
-/** The host is fixed by ADR 0005 (OVH VPS); its identity is public information. */
+/** The host is fixed by ADR 0006 (Cloudflare); its identity is public information (cloudflare.com/privacypolicy). */
 export const HOST = {
-  name: 'OVH SAS',
-  address: '2 rue Kellermann, 59100 Roubaix, France',
-  website: 'https://www.ovhcloud.com',
+  name: 'Cloudflare, Inc.',
+  address: '101 Townsend St., San Francisco, CA 94107, États-Unis',
+  website: 'https://www.cloudflare.com',
 } as const;
 
 export type LegalField = keyof typeof LEGAL;
