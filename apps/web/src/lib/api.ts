@@ -55,6 +55,8 @@ async function send(path: string, { method = 'GET', body, signal }: RequestOptio
       const { code, message, reason } = parsed.data.error;
       throw new ApiRequestError(response.status, code, message, reason);
     }
+    // A static host answers a missing file with a bare 404 (no JSON error body).
+    if (response.status === 404) throw new ApiRequestError(404, 'not_found', 'Not found');
     throw new ApiRequestError(response.status, 'internal', `HTTP ${response.status}`);
   }
   return response;
