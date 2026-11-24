@@ -27,10 +27,9 @@ function adsTxt(): Plugin {
 
 export default defineConfig(({ command }) => ({
   plugins: [react(), tailwindcss(), adsTxt()],
-  // Build only: the generated <script>/<link> tags carry a Caddy template action that Caddy's
-  // `templates` directive turns into the per-request nonce of the CSP header (ADR 0005 D3, profile
-  // adsense). Backticks, not quotes: the value sits inside an HTML attribute.
-  html: command === 'build' ? { cspNonce: '{{placeholder `http.request.uuid`}}' } : {},
+  // Build only: every generated <script>/<link> carries this fixed value in its nonce attribute; the
+  // Cloudflare Worker (edge/worker.ts) replaces it with a fresh nonce per response (ADR 0006 D5).
+  html: command === 'build' ? { cspNonce: '__CSP_NONCE__' } : {},
   build: {
     // Small assets (the woff2 subsets) stay files: a data: font would need `data:` in font-src.
     assetsInlineLimit: 0,

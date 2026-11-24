@@ -17,6 +17,7 @@
     "content:import": "pnpm --filter @tatamap/api exec tsx scripts/content-import.ts",
     "site:export": "pnpm --filter @tatamap/api exec tsx scripts/site-export.ts",
     "site:check": "pnpm --filter @tatamap/api exec tsx scripts/site-check.ts",
+    "site:preview": "VITE_DATA_SOURCE=static pnpm --filter @tatamap/web exec vite build && pnpm site:export && pnpm --filter @tatamap/web exec wrangler dev",
     "content:upgrade": "pnpm --filter @tatamap/api exec tsx scripts/content-upgrade.ts",
     "db:up": "docker compose up -d --wait db",
     "db:down": "docker compose down",
