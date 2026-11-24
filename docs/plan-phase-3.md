@@ -78,23 +78,26 @@ Fait (PR #14) puis retiré : une app mobile équivalente prendra le hors ligne e
 - Bandeau discret quand on est hors ligne.
 - Critère : en mode avion, après une première visite, toute la bibliothèque et les 15 techniques fonctionnent.
 
-### Lot 8 — Mise en ligne
+### Lot 8 — Mise en ligne (site statique, ADR 0006)
 
-- Contrainte : même origine pour le front et l'API (ADR 0003 B6), donc soit un seul hébergeur pour les deux, soit une réécriture `/api/*` du front vers l'API. **Décidé (ADR 0005)** : VPS OVH, Caddy sert le front et relaie `/api/*` vers l'API.
-- Base PostgreSQL de prod, migrations en CI au déploiement, `pnpm admin:create` en prod, `content:import` depuis le repo privé.
-- En-têtes : CSP stricte, HSTS, `COOKIE_SECURE=true` obligatoire.
-- Pages légales : mentions légales (obligatoires pour un site édité par une micro-entreprise), politique de confidentialité qui mentionne AdSense. Consentement RGPD par le CMP de Google (bandeau géré par Google, configuré dans le compte AdSense). AdSense présent au lancement (ADR 0005 D3, CSP à nonce) ; demande de validation envoyée dès que le site est ouvert.
-- Audit cybersécurité avant d'ouvrir l'adresse.
-- Critère : `https://tatamap.fr` sert le site, l'admin fonctionne en prod, l'audit ne relève rien de bloquant.
+Remplace le plan VPS OVH (ADR 0005, gardé comme repli, tag `archive/vps-ovh-2026-11`). Décision du 2026-11-24 : aucun abonnement, seule la pub rapporte ; le site public est 100 % statique sur Cloudflare Workers, sans API, base ni admin en ligne. L'API, la base, l'admin et l'éditeur restent en local.
+
+Fait (branche `feat/static-site`) : couche de données `lib/public-data.ts` (`VITE_DATA_SOURCE`), build sans admin et `site:export` / `site:check`, Worker (nonce CSP) + `_headers` + `site:preview`, workflow `site` (déploiement Cloudflare), pages légales (Cloudflare, transferts hors UE, pas de compte), docs.
+
+Reste à faire :
+- **Comptes et DNS (Fares)** : compte Cloudflare (double authentification), zone `tatamap.fr` (serveurs de noms depuis OVH, DNSSEC), jeton API restreint, clé de déploiement sur `tatamap-content`, environnement GitHub `production`, variables `VITE_LEGAL_*`.
+- **CSP en Report-Only pendant deux semaines**, puis CSP en application, puis demande AdSense une fois le site ouvert (consentement par le CMP de Google).
+- **Audit `cybersecu`** avant d'ouvrir l'adresse : en-têtes réels (HTML, `/data`, `/assets`), absence de l'admin et de `/api` dans le build, jetons à privilège minimal, workflow sans artefact ni contenu dans les journaux.
+- Critère : `https://tatamap.fr` sert le site statique, l'audit ne relève rien de bloquant.
 
 ### Lot 9 — Clubs testeurs (côté Fares, avec support)
 
 - 2 ou 3 clubs. Support à préparer : une page ou un PDF de présentation d'une page, et un formulaire de retour court (ce qui sert, ce qui manque, combien ils paieraient).
-- Mesure d'usage sans traceur : compteurs agrégés côté serveur (pages vues par technique), sans cookie.
+- Mesure d'usage sans traceur : sans serveur en ligne, à reconsidérer (statistiques agrégées de l'hébergeur, sans cookie) ; pas de mesure tant que ce n'est pas tranché.
 - Critère de la phase : **un prof prêt à payer**.
 
 ## Décisions ouvertes
 
-1. Hébergement et même origine : décidé, ADR 0005.
+1. Hébergement : décidé, ADR 0006 (site statique sur Cloudflare ; ADR 0005 en repli).
 2. Adresse de contact affichée : aujourd'hui l'adresse personnelle de Fares dans la maquette ; à remplacer par une adresse sur `tatamap.fr` dès que le domaine est pris.
 3. Correction des membres qui frôlent l'adversaire dans certaines transitions (contenu) : à traiter avant les clubs ou après, selon les retours.
