@@ -7,7 +7,9 @@
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
-    "not_found_handling": "single-page-application",
+    // No SPA fallback here: it would also answer missing static files with index.html. The Worker
+    // serves index.html for unknown navigations instead (edge/worker.ts).
+    "not_found_handling": "none",
     // The Worker only sees HTML navigations: every static file bypasses it (free and unlimited).
     "run_worker_first": [
       "/*",
