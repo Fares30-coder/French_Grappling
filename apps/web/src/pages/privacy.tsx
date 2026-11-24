@@ -47,8 +47,8 @@ export function PrivacyPage() {
         <h2 className={legalH2Class}>Publicité (Google AdSense)</h2>
         <p className="m-0">
           {ADSENSE_CLIENT
-            ? "Une colonne de publicité s'affiche à droite des pages sur ordinateur. Elle est fournie par Google AdSense."
-            : "Une colonne de publicité peut s'afficher à droite des pages sur ordinateur. Elle est fournie par Google AdSense."}{' '}
+            ? "Une colonne de publicité s'affiche à droite des pages sur ordinateur, et un encart dans les pages techniques sur mobile et tablette. Ils sont fournis par Google AdSense."
+            : "Une colonne de publicité peut s'afficher à droite des pages sur ordinateur, et un encart dans les pages techniques sur mobile et tablette. Ils sont fournis par Google AdSense."}{' '}
           Google est alors destinataire de données de ta navigation (adresse IP, identifiants
           publicitaires, informations sur ton navigateur) et peut déposer ou lire des cookies pour
           choisir et mesurer les annonces. Ces traitements ne se font qu'avec ton accord : à ta

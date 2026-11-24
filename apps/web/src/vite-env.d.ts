@@ -9,6 +9,7 @@ interface ImportMetaEnv {
   readonly VITE_ADSENSE_CLIENT?: string;
   /** AdSense ad unit id of the right-hand rail. */
   readonly VITE_ADSENSE_SLOT_RAIL?: string;
+  readonly VITE_ADSENSE_SLOT_INLINE?: string;
   /** Publisher identity of the legal notice (LCEN). Public by law, but kept out of this public repo: set at build time. Unset = shown as "to fill in". */
   readonly VITE_LEGAL_NAME?: string;
   readonly VITE_LEGAL_STATUS?: string;

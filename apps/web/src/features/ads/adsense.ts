@@ -1,10 +1,12 @@
 /**
- * Google AdSense. Off until VITE_ADSENSE_CLIENT and VITE_ADSENSE_SLOT_RAIL are set.
+ * Google AdSense. Off until VITE_ADSENSE_CLIENT is set; each slot also needs its ad unit id
+ * (VITE_ADSENSE_SLOT_RAIL: wide-screen rail, VITE_ADSENSE_SLOT_INLINE: phones and tablets).
  * Consent (GDPR) is handled by Google's certified CMP, enabled in the AdSense dashboard
  * ("Privacy & messaging" > "European regulations"): it is served by the same script.
  */
 export const ADSENSE_CLIENT = import.meta.env.VITE_ADSENSE_CLIENT;
 export const ADSENSE_SLOT_RAIL = import.meta.env.VITE_ADSENSE_SLOT_RAIL;
+export const ADSENSE_SLOT_INLINE = import.meta.env.VITE_ADSENSE_SLOT_INLINE;
 
 import { isAdminPath } from '../../lib/admin-isolation';
 

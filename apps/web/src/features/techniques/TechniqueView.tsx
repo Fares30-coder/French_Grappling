@@ -9,6 +9,7 @@ import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from 'rea
 import { Link } from 'react-router';
 import { Badge } from '../../ui/Badge';
 import { buttonClass } from '../../ui/button';
+import { InlineAd } from '../ads/AdRail';
 import { PUBLIC_SCENE } from '../viewer/theme';
 
 // three.js is loaded with the viewer, after the text: it never weighs on the first paint.
@@ -367,6 +368,8 @@ export function TechniqueView({
         <ListCard title="Points clés" items={data.keyPoints} tone="good" />
         <ListCard title="Erreurs fréquentes" items={data.commonMistakes} tone="bad" />
       </div>
+
+      <InlineAd key={data.slug} />
 
       {data.chains.length > 0 && (
         <section aria-labelledby="enchainements" className="flex flex-col gap-3.5">
