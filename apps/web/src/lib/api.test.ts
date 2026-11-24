@@ -85,6 +85,12 @@ describe('apiRequest / apiSend', () => {
     expect(error).toMatchObject({ status: 409, code: 'conflict', reason: 'version_mismatch' });
   });
 
+  it('maps a bare 404 (static host, no JSON body) to not_found', async () => {
+    stubFetch(new Response('<html></html>', { status: 404 }));
+    const error = await apiRequest('/data/v1/x.json', schema).catch((e: unknown) => e);
+    expect(error).toMatchObject({ status: 404, code: 'not_found' });
+  });
+
   it('reports a network failure with code "network"', async () => {
     stubFetch(new TypeError('offline'));
     const error = await apiRequest('/api/x', schema).catch((e: unknown) => e);

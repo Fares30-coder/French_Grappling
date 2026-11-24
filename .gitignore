@@ -24,3 +24,10 @@ __pycache__/
 *.mov
 *.m4v
 *.webm
+
+# Wrangler local state
+.wrangler/
+
+# Wrangler local secrets
+.dev.vars
+.dev.vars.*

@@ -1,0 +1,32 @@
+// Cloudflare Worker + static assets of the public site (ADR 0006). Deploy: CI workflow `site`.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tatamap",
+  "main": "edge/worker.ts",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // The Worker only sees HTML navigations: every static file bypasses it (free and unlimited).
+    "run_worker_first": [
+      "/*",
+      "!/assets/*",
+      "!/data/*",
+      "!/models/*",
+      "!/ads.txt",
+      "!/favicon.svg",
+      "!/apple-touch-icon.png"
+    ]
+  },
+  // CSP violation reports (POST /csp-report) are logged by the Worker with console.log.
+  "observability": { "enabled": true },
+  // TODO 2026-11-24: set workers_dev and preview_urls to false once the custom domain is attached.
+  "vars": {
+    // Fail closed: unknown profile = strict, enforced unless CSP_REPORT_ONLY is exactly "true".
+    // The site workflow overrides CSP_PROFILE with 'strict' when VITE_ADSENSE_CLIENT is empty.
+    // Report-only for the first two weeks (ADR 0006 D5), then set to "false".
+    "CSP_PROFILE": "adsense",
+    "CSP_REPORT_ONLY": "true"
+  }
+}

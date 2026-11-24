@@ -9,6 +9,7 @@ import {
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { fetchJson } from '../../lib/api';
+import { publicUrl } from '../../lib/public-data';
 import { buttonClass } from '../../ui/button';
 import { PageHeader } from '../../ui/text';
 import { type GraphLayout, type LaidNode, layoutGraph, type Orientation } from './graph-layout';
@@ -19,7 +20,7 @@ const focusRing =
 function useGraph() {
   return useQuery({
     queryKey: ['graph'],
-    queryFn: ({ signal }) => fetchJson('/api/graph', graphSchema, { signal }),
+    queryFn: ({ signal }) => fetchJson(publicUrl({ kind: 'graph' }), graphSchema, { signal }),
   });
 }
 

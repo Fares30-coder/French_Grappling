@@ -11,7 +11,7 @@ export function PrivacyPage() {
       <PageHeader
         eyebrow="Tes données"
         title="Politique de confidentialité"
-        lead="Tatamap collecte le strict minimum : pas de compte visiteur, pas de statistiques, pas de traceur de notre part."
+        lead="Tatamap collecte le strict minimum : pas de compte, pas de base de données en ligne, pas de statistiques, pas de traceur de notre part."
       />
       <section className={legalSectionClass}>
         <h2 className={legalH2Class}>Responsable du traitement</h2>
@@ -27,15 +27,11 @@ export function PrivacyPage() {
         <h2 className={legalH2Class}>Ce que le site enregistre</h2>
         <ul className="m-0 flex list-disc flex-col gap-1.5 pl-5">
           <li>
-            <strong className="text-ink">Journaux du serveur.</strong> Comme tout serveur web,
-            l'hébergement conserve pour des raisons de sécurité et de dépannage l'adresse IP, la
-            date et la page demandée, pendant une durée limitée (rotation automatique de quelques
-            jours). Base légale : intérêt légitime (sécurité du service).
-          </li>
-          <li>
-            <strong className="text-ink">Session d'administration.</strong> Seul l'éditeur se
-            connecte au site. Pour cela, un cookie de session strictement nécessaire est déposé
-            après connexion. Les visiteurs n'ont ni compte ni ce cookie.
+            <strong className="text-ink">Journaux techniques du réseau de diffusion.</strong> Pour
+            servir le site et le protéger (sécurité, lutte contre les abus), {HOST.name} traite
+            l'adresse IP, la date, la page demandée et des informations techniques sur le
+            navigateur, pendant une durée limitée fixée par l'hébergeur. Base légale : intérêt
+            légitime (sécurité du service).
           </li>
           <li>
             <strong className="text-ink">Aucun autre traceur.</strong> Pas d'outil de statistiques,
@@ -63,7 +59,8 @@ export function PrivacyPage() {
             l'usage des données par Google
           </a>
           . Ces données peuvent être transférées hors de l'Union européenne, sous les garanties
-          prévues par Google (clauses contractuelles types, cadre de protection des données).
+          prévues par Google (clauses contractuelles types, cadre de protection des données
+          UE-États-Unis).
         </p>
         <p className="m-0">
           Sans ton accord, les annonces ne sont pas personnalisées ; tu peux aussi les bloquer avec
@@ -71,11 +68,17 @@ export function PrivacyPage() {
         </p>
       </section>
       <section className={legalSectionClass}>
-        <h2 className={legalH2Class}>Hébergement et durée de conservation</h2>
+        <h2 className={legalH2Class}>
+          Hébergement, transferts hors Union européenne et conservation
+        </h2>
         <p className="m-0">
-          Les données sont hébergées en France chez {HOST.name}. Le cookie de session
-          d'administration expire après quelques heures d'inactivité. Les journaux sont effacés
-          automatiquement au bout de quelques jours.
+          Le site est hébergé par {HOST.name}, société établie aux États-Unis, qui le diffuse depuis
+          des serveurs situés dans de nombreux pays. Les transferts de données qui en résultent
+          (adresse IP et journaux techniques) reposent sur le cadre de protection des données
+          UE-États-Unis (Data Privacy Framework) lorsque le destinataire y adhère, ou à défaut sur
+          les clauses contractuelles types de la Commission européenne ; il en va de même pour
+          Google (voir ci-dessus). Les durées de conservation des journaux sont celles fixées par
+          ces prestataires. Le site ne dépose lui-même aucun cookie.
         </p>
       </section>
       <section className={legalSectionClass}>

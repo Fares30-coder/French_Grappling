@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, useParams } from 'react-router';
+import { createBrowserRouter, Navigate, type RouteObject, useParams } from 'react-router';
 import { HomePage } from './features/home/HomePage';
 import { PublicLayout } from './features/layout/PublicLayout';
 import { LibraryPage } from './features/library/LibraryPage';
@@ -28,7 +28,52 @@ const devRoutes = import.meta.env.DEV
     ]
   : [];
 
+// The deployed site (VITE_DATA_SOURCE=static, ADR 0006 D1) has no admin: the build-time constant
+// lets the bundler drop the routes and their lazy chunks, so no admin code reaches dist/.
+const withAdmin = import.meta.env.VITE_DATA_SOURCE !== 'static';
+
 // The admin is lazy-loaded: the editor and its 3D tools never weigh on the public bundle.
+const adminRoutes: RouteObject[] = withAdmin
+  ? [
+      {
+        path: '/admin/login',
+        lazy: async () => ({
+          Component: (await import('./features/admin/auth/LoginPage')).LoginPage,
+        }),
+      },
+      {
+        path: '/admin',
+        lazy: async () => ({
+          Component: (await import('./features/admin/auth/RequireAdmin')).RequireAdmin,
+        }),
+        children: [
+          {
+            lazy: async () => ({
+              Component: (await import('./features/admin/AdminLayout')).AdminLayout,
+            }),
+            children: [
+              { index: true, element: <Navigate to="/admin/techniques" replace /> },
+              {
+                path: 'techniques',
+                lazy: async () => ({
+                  Component: (await import('./features/admin/techniques/AdminTechniqueListPage'))
+                    .AdminTechniqueListPage,
+                }),
+              },
+              {
+                path: 'techniques/:id',
+                lazy: async () => ({
+                  Component: (await import('./features/admin/editor/TechniqueEditorPage'))
+                    .TechniqueEditorPage,
+                }),
+              },
+            ],
+          },
+        ],
+      },
+    ]
+  : [];
+
 export const router = createBrowserRouter([
   {
     // Public pages share the dark shell; the pathless child keeps the shell around route errors.
@@ -50,40 +95,7 @@ export const router = createBrowserRouter([
     ],
   },
   ...devRoutes,
-  {
-    path: '/admin/login',
-    lazy: async () => ({ Component: (await import('./features/admin/auth/LoginPage')).LoginPage }),
-  },
-  {
-    path: '/admin',
-    lazy: async () => ({
-      Component: (await import('./features/admin/auth/RequireAdmin')).RequireAdmin,
-    }),
-    children: [
-      {
-        lazy: async () => ({
-          Component: (await import('./features/admin/AdminLayout')).AdminLayout,
-        }),
-        children: [
-          { index: true, element: <Navigate to="/admin/techniques" replace /> },
-          {
-            path: 'techniques',
-            lazy: async () => ({
-              Component: (await import('./features/admin/techniques/AdminTechniqueListPage'))
-                .AdminTechniqueListPage,
-            }),
-          },
-          {
-            path: 'techniques/:id',
-            lazy: async () => ({
-              Component: (await import('./features/admin/editor/TechniqueEditorPage'))
-                .TechniqueEditorPage,
-            }),
-          },
-        ],
-      },
-    ],
-  },
+  ...adminRoutes,
 ]);
 
 // Entering /admin from a public page is a full page load: the AdSense script never shares a

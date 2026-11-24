@@ -1,6 +1,0 @@
-# Whole site behind basic auth until the audit is done (ADR 0005 D2). /api/health stays open for
-# the deploy check and the uptime probe. PRELAUNCH_HASH: `docker run --rm caddy caddy hash-password`.
-@locked not path /api/health
-basic_auth @locked {
-	{$PRELAUNCH_USER} {$PRELAUNCH_HASH}
-}

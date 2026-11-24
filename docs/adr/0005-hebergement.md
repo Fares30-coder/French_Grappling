@@ -1,6 +1,6 @@
 # ADR 0005 — Hébergement et mise en ligne
 
-- Statut : accepté (validé par Fares le 2026-11-23)
+- Statut : remplacé par ADR 0006 le 2026-11-24 (reste le plan de repli)
 - Date : 2026-11-23
 - Auteur : agent architecte (pour Fares Haouari)
 - Portée : phase 3, lot 8 (`docs/plan-phase-3.md`)

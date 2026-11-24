@@ -13,8 +13,8 @@ Documents de référence :
 - **Différenciation** face au marché (Grapplearts, BJJ Fanatics, GrappleKit, BJJ OS, Your BJJ, Tatami…, presque tous en anglais) : le français, la 3D orientable, la carte des positions (graphe).
 - **Animations** : pas de vidéo générée par IA (rendu faux sur le grappling). Chaque technique = une suite de poses (articulations des 2 combattants), interpolées. Le contenu est créé via un **éditeur de poses admin**.
 - **Rendu 3D** (ADR 0004) : on garde Three.js / R3F. Étape 1 faite : le mannequin Blender des vidéos, exporté en glTF (`fighter.v3.glb` : corps réaliste MakeHuman/MPFB en CC0, addendum 2026-11-09), piloté par les articulations (`features/viewer/rig.ts`, testé contre Blender). Étape 2 faite : squelette `v2-21` (épaules, hanches, buste, mains, pieds, nez en données), contenu converti par `upgradePose`. Changer de moteur ne réécrirait que le viewer et les enfants 3D de l'éditeur.
-- **Monétisation** (seulement après validation en club) : 1) abonnement clubs/profs (B2B, piste principale), 2) freemium pratiquants, 3) affiliation contextuelle (instructionals, kimonos), 4) sponsoring d'une catégorie. **Pas de pop-ups.** Une seule colonne de pub à droite, desktop seulement (`features/ads`, décidé le 2026-11-16) : un sponsor direct en priorité, sinon AdSense (activé par `VITE_ADSENSE_CLIENT` / `VITE_ADSENSE_SLOT_RAIL`, consentement RGPD par le CMP de Google), sinon un encart « Devenir sponsor ».
-- Encaissement via la micro-entreprise de Fares (Stripe).
+- **Monétisation** : pub seule (décidé le 2026-11-24 : aucun abonnement, ni clubs ni pratiquants), plus affiliation contextuelle (instructionals, kimonos) et sponsoring d'une catégorie. **Pas de pop-ups.** Une seule colonne de pub à droite, desktop seulement (`features/ads`, décidé le 2026-11-16) : un sponsor direct en priorité, sinon AdSense (activé par `VITE_ADSENSE_CLIENT` / `VITE_ADSENSE_SLOT_RAIL`, consentement RGPD par le CMP de Google), sinon un encart « Devenir sponsor ».
+- Revenus encaissés via la micro-entreprise de Fares (AdSense, sponsors directs).
 
 ## Stack
 
@@ -26,15 +26,15 @@ Documents de référence :
 | Back | Node 24 + Fastify 5 + TypeScript (build tsdown, dev tsx) |
 | ORM / base | Prisma + PostgreSQL (poses en JSONB) |
 | Validation | Zod, schémas partagés front/back |
-| Auth | Un seul compte admin créé par `pnpm admin:create` (argon2id) ; JWT HS256 de 2 h (renouvelé à l'usage) en cookie `HttpOnly; Secure; SameSite=Strict` ; contrôle d'`Origin` sur les requêtes d'écriture (ADR 0003) |
-| Hébergement | VPS OVH en France : Docker Compose (Caddy + API + PostgreSQL 17), même origine `https://tatamap.fr`, déploiement par GitHub Actions (SSH, commande forcée), sauvegardes chiffrées sur OVH Object Storage (ADR 0005) |
+| Auth | En local seulement : un seul compte admin créé par `pnpm admin:create` (argon2id) ; JWT HS256 de 2 h (renouvelé à l'usage) en cookie `HttpOnly; Secure; SameSite=Strict` ; contrôle d'`Origin` sur les requêtes d'écriture (ADR 0003) |
+| Hébergement | Site 100 % statique sur Cloudflare Workers (static assets + Worker pour le nonce CSP), JSON générés par la CI depuis `tatamap-content` ; API, base, admin et éditeur en local seulement (ADR 0006, repli : ADR 0005) |
 | CI | GitHub Actions |
 | Outillage | pnpm 12 (workspaces + catalogue), Node 24 LTS, TypeScript 6 strict, Biome (lint + format), Vitest |
 | Base locale | PostgreSQL 17 via docker-compose |
 
 Structure prévue (monorepo) : `apps/web`, `apps/api`, `packages/shared`, `docker-compose.yml` (PostgreSQL local).
 
-Décisions détaillées : `docs/adr/` (0001 outillage, 0002 modèle de données et format de pose, 0003 admin, API d'écriture et éditeur, 0004 évolution du rendu 3D, 0005 hébergement). Plans : `docs/plan-phase-1.md`, `docs/plan-phase-2.md`.
+Décisions détaillées : `docs/adr/` (0001 outillage, 0002 modèle de données et format de pose, 0003 admin, API d'écriture et éditeur, 0004 évolution du rendu 3D, 0005 hébergement VPS, remplacé par 0006, 0006 site statique). Plans : `docs/plan-phase-1.md`, `docs/plan-phase-2.md`.
 
 ## Modèle de données
 
@@ -102,6 +102,8 @@ const OPP_5 = [[30,12,140],[30,14,115],[30,14,20],[55,20,75],[40,40,45],[5,20,75
 
 ## API REST (MVP)
 
+En local seulement. En ligne, les lectures publiques sont des fichiers `/data/v1/*.json` de même forme (ADR 0006).
+
 Public (techniques publiées uniquement) :
 - `GET /api/techniques?categorie=&position=&niveau=&gi=&q=`
 - `GET /api/techniques/:slug` (étapes, poses, enchaînements)
@@ -129,8 +131,8 @@ Le viewer 3D est **un seul composant réutilisé** (page technique, vignettes au
 
 1. **Socle** : repo, CI, Prisma, API en lecture, viewer 3D sur un JSON → critère : *le ciseau s'anime en lisant l'API*
 2. **Contenu** : éditeur de poses, connexion admin, 15 à 20 techniques → critère : *15 techniques publiées*
-3. **Test en club** : carte des positions, mise en ligne (ADR 0005), 2 ou 3 clubs testeurs → critère : *un prof prêt à payer*
-4. **Revenus** : espace club, abonnements Stripe, dépôt de marque INPI
+3. **Test en club** : carte des positions, mise en ligne (ADR 0006), 2 ou 3 clubs testeurs → critère : *un prof prêt à payer*
+4. **Revenus** : pub (AdSense, sponsors), dépôt de marque INPI
 
 ## Prochaines étapes immédiates (phase 1)
 
@@ -143,6 +145,7 @@ Le viewer 3D est **un seul composant réutilisé** (page technique, vignettes au
 ## Conventions
 
 - Code et commentaires en anglais, contenu du site en français.
+- Sous-agents : lancer les agents de `.claude/agents/` par leur nom (le `model` de leur fiche s'applique), jamais `general-purpose` qui « joue le rôle ».
 - TypeScript strict partout.
 - Frontière 3D : `three` / `@react-three/*` uniquement dans `features/viewer`, les enfants 3D de l'éditeur et `features/dev` (règle Biome `noRestrictedImports`). Une pose ne contient que des points en cm, rien de propre au moteur.
 - Le repo de code est **public** (portfolio). Le contenu (positions, tags, techniques) est exporté dans `content/` par `pnpm content:export` et réimporté par `pnpm content:import` (sauvegarde et passage en prod). `content/` est un clone du repo **privé** `Fares30-coder/tatamap-content`, ignoré par ce repo : ne jamais commiter de contenu ici.
