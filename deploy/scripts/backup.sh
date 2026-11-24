@@ -34,6 +34,7 @@ ls -1t "$BACKUP_DIR"/tatamap-*.dump.age | tail -n +8 | xargs -r rm -f
 
 [ "$local_only" = 1 ] && { echo "local backup: $file"; exit 0; }
 
-rclone copy "$file" "$RCLONE_REMOTE"
+# Write-only key: no listing, no HEAD of the destination, no bucket check (each needs read rights).
+rclone copy --no-check-dest --s3-no-check-bucket "$file" "$RCLONE_REMOTE"
 curl -fsS --max-time 10 "$PING_URL" >/dev/null
 echo "backup done: $file"
