@@ -20,8 +20,15 @@ type Env = {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    if (new URL(request.url).pathname === CSP_REPORT_PATH) return handleCspReport(request);
-    const asset = await env.ASSETS.fetch(request);
+    const url = new URL(request.url);
+    if (url.pathname === CSP_REPORT_PATH) return handleCspReport(request);
+    let asset = await env.ASSETS.fetch(request);
+    // SPA fallback done here, not by the assets layer (not_found_handling: "none"): the Worker only
+    // sees navigations, so a missing /assets, /data or /models file stays a real 404 instead of
+    // index.html (cached as immutable under /assets). Client routes are resolved by the app.
+    if (asset.status === 404 && (request.method === 'GET' || request.method === 'HEAD')) {
+      asset = await env.ASSETS.fetch(new Request(new URL('/', url), request));
+    }
     if (!asset.headers.get('Content-Type')?.includes('text/html')) return asset;
 
     const nonce = generateNonce();
