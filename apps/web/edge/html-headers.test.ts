@@ -4,6 +4,7 @@ import {
   generateNonce,
   htmlHeaders,
   injectNonce,
+  MINIMAL_CSP,
   NONCE_PLACEHOLDER,
 } from './html-headers';
 
@@ -43,7 +44,12 @@ describe('htmlHeaders', () => {
       'Content-Security-Policy',
     );
     const report = htmlHeaders({ ...base, reportOnly: true });
-    expect(report['Content-Security-Policy']).toBeUndefined();
+    expect(report['Content-Security-Policy']).toBe(MINIMAL_CSP);
+    expect(report['X-Frame-Options']).toBe('DENY');
+    expect(report['Reporting-Endpoints']).toBe('csp="/csp-report"');
+    expect(report['Content-Security-Policy-Report-Only']).toContain(
+      'report-to csp; report-uri /csp-report',
+    );
     expect(report['Content-Security-Policy-Report-Only']).toBeDefined();
   });
 

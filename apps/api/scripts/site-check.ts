@@ -1,6 +1,7 @@
 // Usage: pnpm site:check [distDir]
 // Checks a site build (default apps/web/dist) before deployment (ADR 0006 D4): every JSON file
-// matches its schema, at least one technique is published, no admin code or API route is in dist/.
+// matches its schema, at least one technique is published, no admin code, API route or source map is in dist/.
+import { readFileSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,6 +15,8 @@ import {
 
 const REPO_ROOT = fileURLToPath(new URL('../../..', import.meta.url));
 const dist = resolve(REPO_ROOT, process.argv[2] ?? 'apps/web/dist');
+
+const FORBIDDEN = ['/api/admin', '/api/auth', '/admin/login'];
 
 async function* walk(dir: string): AsyncGenerator<string> {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
@@ -39,9 +42,11 @@ async function main(): Promise<void> {
   const leaks: string[] = [];
   for await (const file of walk(dist)) {
     if (/\.(woff2?|png|glb|ico)$/.test(file)) continue;
-    if ((await readFile(file, 'utf8')).includes('/api/admin')) leaks.push(file);
+    if (file.endsWith('.map')) leaks.push(file);
+    else if (FORBIDDEN.some((s) => readFileSync(file, 'utf8').includes(s))) leaks.push(file);
   }
-  if (leaks.length > 0) throw new Error(`/api/admin found in ${leaks.length} file(s) of dist/`);
+  if (leaks.length > 0)
+    throw new Error(`Admin/API code or source maps found in ${leaks.length} file(s) of dist/`);
   console.log(`Site check passed: ${list.techniques.length} techniques, no admin code in dist/`);
 }
 

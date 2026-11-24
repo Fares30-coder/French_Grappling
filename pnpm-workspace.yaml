@@ -17,6 +17,9 @@ allowBuilds:
   "@prisma/engines": true
   workerd: true
 
+overrides:
+  effect: "^3.22.1"
+
 minimumReleaseAgeExclude:
   - react-router@8.5.1
   - "@cloudflare/workers-utils@0.57.0"

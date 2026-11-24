@@ -19,8 +19,13 @@
       "!/apple-touch-icon.png"
     ]
   },
+  // CSP violation reports (POST /csp-report) are logged by the Worker with console.log.
+  "observability": { "enabled": true },
+  // TODO 2026-11-24: set workers_dev and preview_urls to false once the custom domain is attached.
   "vars": {
-    // 'strict' = no ads. Report-only for the first two weeks (ADR 0006 D5), then set to "false".
+    // Fail closed: unknown profile = strict, enforced unless CSP_REPORT_ONLY is exactly "true".
+    // The site workflow overrides CSP_PROFILE with 'strict' when VITE_ADSENSE_CLIENT is empty.
+    // Report-only for the first two weeks (ADR 0006 D5), then set to "false".
     "CSP_PROFILE": "adsense",
     "CSP_REPORT_ONLY": "true"
   }

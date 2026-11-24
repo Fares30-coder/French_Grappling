@@ -27,3 +27,7 @@ __pycache__/
 
 # Wrangler local state
 .wrangler/
+
+# Wrangler local secrets
+.dev.vars
+.dev.vars.*
