@@ -21,7 +21,12 @@
   },
   // CSP violation reports (POST /csp-report) are logged by the Worker with console.log.
   "observability": { "enabled": true },
-  // TODO 2026-11-24: set workers_dev and preview_urls to false once the custom domain is attached.
+  // Served on tatamap.fr only (zone on Cloudflare, ADR 0006 D5). Deploying it needs the token's
+  // "Workers Routes: Edit" on that zone. No workers.dev address and no preview URLs: one public origin.
+  // www.tatamap.fr is redirected to the apex by a zone redirect rule, not by this Worker.
+  "routes": [{ "pattern": "tatamap.fr", "custom_domain": true }],
+  "workers_dev": false,
+  "preview_urls": false,
   "vars": {
     // Fail closed: unknown profile = strict, enforced unless CSP_REPORT_ONLY is exactly "true".
     // The site workflow overrides CSP_PROFILE with 'strict' when VITE_ADSENSE_CLIENT is empty.
