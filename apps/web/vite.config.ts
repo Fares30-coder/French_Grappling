@@ -4,14 +4,28 @@ import { defineConfig, type Plugin } from 'vite';
 
 const apiProxy = { '/api': process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:3000' };
 
-/** Emits `ads.txt` (required by AdSense) when VITE_ADSENSE_CLIENT is set at build time. */
-function adsTxt(): Plugin {
+/**
+ * When VITE_ADSENSE_CLIENT is set at build time: emits `ads.txt` (required by AdSense) and adds the
+ * `google-adsense-account` meta tag, which lets Google verify the site even though the AdSense
+ * script itself only loads with the first ad shown (wide screens, slot configured).
+ */
+function adsense(): Plugin {
   let client: string | undefined;
   return {
     name: 'tatamap-ads-txt',
     apply: 'build',
     configResolved(config) {
       client = config.env.VITE_ADSENSE_CLIENT;
+    },
+    transformIndexHtml() {
+      if (!client) return;
+      return [
+        {
+          tag: 'meta',
+          attrs: { name: 'google-adsense-account', content: client },
+          injectTo: 'head',
+        },
+      ];
     },
     generateBundle() {
       if (!client) return;
@@ -26,7 +40,7 @@ function adsTxt(): Plugin {
 }
 
 export default defineConfig(({ command }) => ({
-  plugins: [react(), tailwindcss(), adsTxt()],
+  plugins: [react(), tailwindcss(), adsense()],
   // Build only: every generated <script>/<link> carries this fixed value in its nonce attribute; the
   // Cloudflare Worker (edge/worker.ts) replaces it with a fresh nonce per response (ADR 0006 D5).
   html: command === 'build' ? { cspNonce: '__CSP_NONCE__' } : {},
