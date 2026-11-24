@@ -38,9 +38,24 @@ echo "published techniques: $(q "select count(*) from \"Technique\" where status
 
 echo "==> content export vs $CONTENT_CLONE"
 mkdir -p "$WORK/export"
-DATABASE_URL="postgresql://restore_user:restore@localhost:${DB_PORT:-5432}/tatamap_restore" \
+# Same port as `pnpm db:up`: DB_PORT of the root .env when set there.
+db_port="${DB_PORT:-$(sed -n 's/^DB_PORT=//p' .env 2>/dev/null | tail -n 1)}"
+DATABASE_URL="postgresql://restore_user:restore@localhost:${db_port:-5432}/tatamap_restore" \
   CONTENT_DIR="$WORK/export" pnpm content:export >/dev/null
-for item in positions.json tags.json techniques; do
-  diff -r "$WORK/export/$item" "$CONTENT_CLONE/$item" && echo "same: $item"
+# Compared on substance: the files of the content repo are not all in the export's canonical form
+# (48.0 written by the Python tools, key order, chain order).
+norm='walk(if type == "number" then . + 0
+  elif type == "array" and length > 0 and (.[0] | type == "object" and has("to")) then sort_by(.to, .type)
+  else . end)'
+same() { cmp -s <(jq -S "$norm" "$1") <(jq -S "$norm" "$2"); }
+bad=0
+for f in positions.json tags.json; do
+  same "$WORK/export/$f" "$CONTENT_CLONE/$f" || { echo "differs: $f"; bad=1; }
 done
-echo "OK. Note today's date in deploy/README.md (last restore test)."
+for name in $( (cd "$WORK/export/techniques" && ls; cd "$CONTENT_CLONE/techniques" && ls) | sort -u); do
+  [ -f "$WORK/export/techniques/$name" ] && [ -f "$CONTENT_CLONE/techniques/$name" ] \
+    || { echo "only on one side: techniques/$name"; bad=1; continue; }
+  same "$WORK/export/techniques/$name" "$CONTENT_CLONE/techniques/$name" || { echo "differs: techniques/$name"; bad=1; }
+done
+[ "$bad" = 0 ] || { echo "FAILED: the restored content is not the content of $CONTENT_CLONE" >&2; exit 1; }
+echo "OK: same content as $CONTENT_CLONE. Note today's date in deploy/README.md (last restore test)."

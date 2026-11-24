@@ -145,8 +145,10 @@ jobs:
 
   # Only job with secrets: the SSH key is tied to a forced command on the VPS that accepts a SHA
   # and nothing else. No application secret lives in GitHub.
+  # Off until a server exists: set the repository variable DEPLOY_ENABLED=true (Settings, Variables)
+  # once the VPS is bootstrapped and the DEPLOY_* secrets are filled.
   deploy:
-    if: ${{ !cancelled() && (needs.images.result == 'success' || github.event_name == 'workflow_dispatch') }}
+    if: ${{ !cancelled() && vars.DEPLOY_ENABLED == 'true' && (needs.images.result == 'success' || github.event_name == 'workflow_dispatch') }}
     needs: [images]
     runs-on: ubuntu-latest
     timeout-minutes: 15
