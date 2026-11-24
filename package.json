@@ -15,6 +15,8 @@
     "admin:create": "pnpm --filter @tatamap/api exec tsx scripts/create-admin.ts",
     "content:export": "pnpm --filter @tatamap/api exec tsx scripts/content-export.ts",
     "content:import": "pnpm --filter @tatamap/api exec tsx scripts/content-import.ts",
+    "site:export": "pnpm --filter @tatamap/api exec tsx scripts/site-export.ts",
+    "site:check": "pnpm --filter @tatamap/api exec tsx scripts/site-check.ts",
     "content:upgrade": "pnpm --filter @tatamap/api exec tsx scripts/content-upgrade.ts",
     "db:up": "docker compose up -d --wait db",
     "db:down": "docker compose down",
