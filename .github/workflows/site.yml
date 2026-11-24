@@ -1,0 +1,81 @@
+name: site
+
+# Builds the public static site from the code of main and the private content repo, then deploys it
+# to Cloudflare Workers (ADR 0006 D4). No artifact is uploaded: artifacts of a public repo are
+# downloadable, and dist/ holds the content. Logs only print counters.
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: site-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Run from main only (workflow_dispatch can pick another branch).
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: tatamap
+          POSTGRES_PASSWORD: tatamap
+          POSTGRES_DB: tatamap
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tatamap"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      # Throwaway database of the job: the content is imported here, then exported as JSON.
+      DATABASE_URL: postgresql://tatamap:tatamap@localhost:5432/tatamap
+      # Build-time public variables (Actions variables, not secrets); empty = no ads / fields to fill.
+      VITE_DATA_SOURCE: static
+      VITE_ADSENSE_CLIENT: ${{ vars.VITE_ADSENSE_CLIENT }}
+      VITE_ADSENSE_SLOT_RAIL: ${{ vars.VITE_ADSENSE_SLOT_RAIL }}
+      VITE_LEGAL_NAME: ${{ vars.VITE_LEGAL_NAME }}
+      VITE_LEGAL_STATUS: ${{ vars.VITE_LEGAL_STATUS }}
+      VITE_LEGAL_SIRET: ${{ vars.VITE_LEGAL_SIRET }}
+      VITE_LEGAL_ADDRESS: ${{ vars.VITE_LEGAL_ADDRESS }}
+      VITE_LEGAL_EMAIL: ${{ vars.VITE_LEGAL_EMAIL }}
+      VITE_LEGAL_DIRECTOR: ${{ vars.VITE_LEGAL_DIRECTOR }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      # Read-only deploy key of the private content repo (public key added there as a deploy key).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: Fares30-coder/tatamap-content
+          ssh-key: ${{ secrets.CONTENT_DEPLOY_KEY }}
+          path: content
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6 - reads "packageManager" from package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:generate
+      - run: pnpm --filter @tatamap/api exec prisma migrate deploy
+      # Techniques, positions and tags only: never marketing/ or anything else of the content repo.
+      - run: pnpm content:import
+      - run: pnpm --filter @tatamap/web build
+      - run: pnpm site:export
+      # Schemas, at least one published technique, no admin code in dist/.
+      - run: pnpm site:check
+      - name: Nothing but dist/ changed
+        run: test -z "$(git status --porcelain)"
+      - name: Deploy to Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm --filter @tatamap/web exec wrangler deploy
