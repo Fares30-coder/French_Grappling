@@ -16,3 +16,6 @@
 
 /ads.txt
   Cache-Control: no-cache
+
+/robots.txt
+  Cache-Control: no-cache
