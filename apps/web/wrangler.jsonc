@@ -18,6 +18,7 @@
       "!/models/*",
       "!/ads.txt",
       "!/robots.txt",
+      "!/.well-known/*",
       "!/favicon.svg",
       "!/apple-touch-icon.png"
     ]

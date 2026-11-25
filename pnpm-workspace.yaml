@@ -21,7 +21,5 @@ overrides:
   effect: "^3.22.1"
 
 minimumReleaseAgeExclude:
-  - react-router@8.5.1
-  - "@cloudflare/workers-utils@0.57.0"
   - miniflare@5.20261123.1-beta
   - wrangler@4.168.0
